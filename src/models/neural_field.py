@@ -3,15 +3,19 @@ import statistics
 import numpy as np
 import pandas
 import torch.nn
+import torch.nn.functional as F
 from matplotlib import pyplot as plt
 
 from trainer import Trainer, CheckPoint, Validation
 import os
 import rasterio
-from rasterio.plot import show
 from torchvision import transforms
-from statistics import mean, stdev
 import seaborn as sns
+
+
+def column(it, name):
+    for d in it:
+        yield d[name]
 
 
 class SateliteDataset:
@@ -21,6 +25,8 @@ class SateliteDataset:
         tif_filenames = [filename for filename in os.listdir(path) if filename.endswith(".tif")]
         for month, filename in enumerate(sorted(tif_filenames)):
             im = rasterio.open(path + filename).read()
+            plt.imshow(im[0])
+            plt.show()
             for y in range(im.shape[0]):
                 for x in range(im.shape[1]):
                     bands = im[:, y, x]
@@ -30,30 +36,15 @@ class SateliteDataset:
 
         min_x = min(p['x'] for p in self.points)
         min_y = min(p['y'] for p in self.points)
-        min_month = min(p['month'] for p in self.points)
 
         max_x = max(p['x'] for p in self.points)
         max_y = max(p['y'] for p in self.points)
-        max_month = max(p['month'] for p in self.points)
 
         for p in self.points:
-            p['x'] = (p['x'] - min_x) / max_x
-            p['y'] = (p['y'] - min_y) / max_y
-            p['month'] = (p['month'] - min_month) / max_month
-
-        mean_x = mean(p['x'] for p in self.points)
-        mean_y = mean(p['y'] for p in self.points)
-        mean_month = mean(p['month'] for p in self.points)
-
-        std_x = stdev(p['x'] for p in self.points)
-        std_y = stdev(p['y'] for p in self.points)
-        std_month = stdev(p['month'] for p in self.points)
-
-        for p in self.points:
-            p['x'] = (p['x'] - mean_x) / std_x
-            p['y'] = (p['y'] - mean_y) / std_y
-            p['month'] = (p['month'] - mean_month) / std_month
-            p['bands'] = p['bands'].astype(np.float32) / 255
+            p['x'] = ((p['x'] - min_x) / max_x - 0.5) * 2
+            p['y'] = ((p['y'] - min_y) / max_y - 0.5) * 2
+            p['month'] = p['month'] / 12
+            p['bands'] = p['bands'].astype(np.float32) / 1000
 
     def __len__(self):
         return len(self.points)
@@ -69,6 +60,13 @@ class OnlyOneBand:
     def __call__(self, data):
         inputs, labels = data
         labels = labels[0]
+        return inputs, labels
+
+
+class OnlyColorBands:
+    def __call__(self, data):
+        inputs, labels = data
+        labels = torch.tensor([labels[2], labels[1], labels[0]])
         return inputs, labels
 
 
@@ -106,13 +104,17 @@ class SpatialEncode:
 
     def __call__(self, data):
         inputs, labels = data
+        result = self.do_spatial_encoding(inputs)
+        return result, labels
+
+    def do_spatial_encoding(self, inputs):
         result = torch.zeros(inputs.shape[0] * self.L * 2)
         for i in range(inputs.shape[0]):
             for l in range(self.L):
-                result[i * self.L * 2 + l * 2] = torch.sin(inputs[i] + 2 * np.pi ** l)
-                result[i * self.L * 2 + l * 2 + 1] = torch.cos(inputs[i] + 2 * np.pi ** l)
+                result[i * self.L * 2 + l * 2] = torch.sin(2 ** l * np.pi * inputs[i])
+                result[i * self.L * 2 + l * 2 + 1] = torch.cos(2 ** l * np.pi * inputs[i])
 
-        return result, labels
+        return result
 
 
 class SateliteModel(torch.nn.Module):
@@ -124,10 +126,56 @@ class SateliteModel(torch.nn.Module):
         self.ol = torch.nn.Linear(in_features=width, out_features=1)
 
     def forward(self, x):
-        x = torch.sin(self.il(x))
+        x = F.relu(self.il(x))
         for fc in self.fcs:
-            x = torch.sin(fc(x))
-        x = self.ol(x)
+            x = F.relu(fc(x))
+        x = F.sigmoid(self.ol(x))
+        return x
+
+
+class MyNerf(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        width = 256
+        inputs = 60
+
+        self.fc1 = torch.nn.Linear(in_features=inputs, out_features=width)
+        self.fc2 = torch.nn.Linear(in_features=width, out_features=width)
+        self.fc3 = torch.nn.Linear(in_features=width, out_features=width)
+        self.fc4 = torch.nn.Linear(in_features=width, out_features=width)
+        self.fc5 = torch.nn.Linear(in_features=width, out_features=width)
+
+        self.fc6 = torch.nn.Linear(in_features=width + inputs, out_features=width)
+        self.fc7 = torch.nn.Linear(in_features=width, out_features=width)
+        self.fc8 = torch.nn.Linear(in_features=width, out_features=width)
+        self.fc8 = torch.nn.Linear(in_features=width, out_features=128)
+
+        self.fc9 = torch.nn.Linear(in_features=128, out_features=1)
+
+    def forward(self, x):
+        initial_x = x
+        # x = F.relu(self.fc1(x))
+        # x = F.relu(self.fc2(x))
+        # x = F.relu(self.fc3(x))
+        # x = F.relu(self.fc4(x))
+        # x = F.relu(self.fc5(x))
+        # x = torch.cat([x, initial_x], 1)
+        # x = F.relu(self.fc6(x))
+        # x = F.relu(self.fc7(x))
+        # x = self.fc8(x)
+        # x = F.sigmoid(self.fc9(x))
+
+        x = F.leaky_relu(self.fc1(x))
+        x = F.leaky_relu(self.fc2(x))
+        x = F.leaky_relu(self.fc3(x))
+        x = F.leaky_relu(self.fc4(x))
+        x = F.leaky_relu(self.fc5(x))
+        x = torch.cat([x, initial_x], -1)
+        x = F.leaky_relu(self.fc6(x))
+        x = F.leaky_relu(self.fc7(x))
+        x = self.fc8(x)
+        x = F.sigmoid(self.fc9(x))
+
         return x
 
 
@@ -148,6 +196,17 @@ def compute_bands_correlations():
     plt.show()
 
 
+def view_data():
+    data = SateliteDataset("../../data/s2/")
+
+    loader = torch.utils.data.DataLoader(data,
+                                batch_size=5, shuffle=True,
+                                num_workers=4)
+
+    for m in column(loader, 'bands'):
+        print(m)
+
+
 def train():
     data = SateliteDataset("../../data/s2/", transform=transforms.Compose([
         ToTensor(),
@@ -158,11 +217,11 @@ def train():
     train_data, test_data = torch.utils.data.random_split(data, [0.8, 0.2])
 
     train_loader = torch.utils.data.DataLoader(train_data,
-                                               batch_size=5, shuffle=True,
+                                               batch_size=2, shuffle=True,
                                                num_workers=4)
 
     test_loader = torch.utils.data.DataLoader(test_data,
-                                              batch_size=4, shuffle=True,
+                                              batch_size=2, shuffle=True,
                                               num_workers=4)
 
     # for im in train_loader:
@@ -171,15 +230,33 @@ def train():
     print(len(train_loader))
     print(len(test_loader))
 
-    model = SateliteModel(inputs=60, width=200, depth=12)
-    optim = torch.optim.Adam(params=model.parameters(), lr=0.00001)
+    # model = SateliteModel(inputs=60, width=256, depth=8)
+    model = MyNerf()
+    optim = torch.optim.Adam(params=model.parameters(), lr=0.0001)
     loss = torch.nn.MSELoss()
     trainer = Trainer(model=model, optimizer=optim, loss=loss, train_loader=train_loader, test_loader=test_loader,
                       checkpoint=CheckPoint("./checkpoints/"), validation=Validation())
 
     trainer.train(100)
 
+    return model
+
+
+def query(model):
+    im = np.zeros((100, 100))
+    se = SpatialEncode(10)
+    for i, y in enumerate(np.arange(-1, 1, 0.02)):
+        for j, x in enumerate(np.arange(-1, 1, 0.02)):
+            q = torch.tensor([x, y, 0.5])
+            im[i, j] = model(se.do_spatial_encoding(q))
+
+    return im
 
 if __name__ == '__main__':
     # compute_bands_correlations()
-    train()
+    # view_data()
+    # exit()
+    model = train()
+    im = query(model)
+    plt.imshow(im, cmap='gray')
+    plt.show()

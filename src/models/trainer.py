@@ -25,7 +25,7 @@ class Trainer:
     def train_one_epoch(self, epoch):
         running_loss = 0.
         last_loss = 0.
-
+        l = len(self.train_loader)
         for i, data in enumerate(self.train_loader):
             # Every data instance is an input + label pair
             inputs, labels = data
@@ -34,7 +34,7 @@ class Trainer:
             self.optimizer.zero_grad()
 
             # Make predictions for this batch
-            outputs = self.model(inputs)
+            outputs = self.model(inputs).squeeze()
 
             # Compute the loss and its gradients
             loss = self.loss(outputs, labels)
@@ -45,12 +45,8 @@ class Trainer:
 
             # Gather data and report
             running_loss += loss.item()
-            if i % 100 == 99:
-                last_loss = running_loss / 100  # loss per batch
-                # print('  batch {} loss: {}'.format(i + 1, last_loss))
-                running_loss = 0.
 
-        return last_loss
+        return running_loss / l
 
 
 class CheckPoint:
