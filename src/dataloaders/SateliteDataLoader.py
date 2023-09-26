@@ -2,6 +2,7 @@ import rasterio
 import os
 import numpy as np
 import torch
+from src.config import device
 
 
 class SateliteDataset:
@@ -97,7 +98,7 @@ class PositionalEncode:
         return result, labels
 
     def do_positional_encoding(self, inputs):
-        result = torch.zeros(inputs.shape[0] * self.L * 2)
+        result = torch.zeros(inputs.shape[0] * self.L * 2, device=device)
         for i in range(inputs.shape[0]):
             for l in range(self.L):
                 result[i * self.L * 2 + l * 2] = torch.sin(2 ** l * np.pi * inputs[i])

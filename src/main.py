@@ -84,7 +84,7 @@ def train():
 
     # model = SateliteModel(inputs=60, width=256, depth=8)
     model = MyNerf()
-    # load_checkpoint(model, "/home/arnau/workspace/UAB/TFG/src/models/checkpoints/checkpoint_epoch_99.ckpt")
+    # load_checkpoint(model, "/home/arnau/workspace/UAB/TFG/src/models/checkpoints/siren_checkpoint_epoch_99.ckpt")
     optim = torch.optim.Adam(params=model.parameters(), lr=0.001)
     loss = torch.nn.MSELoss()
     trainer = Trainer(model=model, optimizer=optim, loss=loss, train_loader=train_loader, test_loader=None,
@@ -124,7 +124,7 @@ if __name__ == '__main__':
     # view_bands()
     model = train()
     # model = MyNerf()
-    # load_checkpoint(model, "/home/arnau/workspace/UAB/TFG/src/models/checkpoints/checkpoint_epoch_99.ckpt")
+    # load_checkpoint(model, "/home/arnau/workspace/UAB/TFG/src/models/checkpoints/siren_checkpoint_epoch_99.ckpt")
     im = query(model)
     plt.imshow(im)
     plt.show()

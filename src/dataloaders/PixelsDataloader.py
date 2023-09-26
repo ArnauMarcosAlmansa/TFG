@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 import torch
 
+from src.config import device
+
 
 class PixelsDataset:
     def __init__(self, path, transform=None):
@@ -40,4 +42,6 @@ class PixelsDataset:
 class ToTensor:
     def __call__(self, data):
 
-        return torch.tensor([data['x'], data['y']]), torch.tensor(data['color'])
+        data = torch.tensor([data['x'], data['y']], device=device), torch.tensor(data['color'], device=device)
+
+        return data

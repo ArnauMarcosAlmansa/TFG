@@ -17,6 +17,8 @@ from src.dataloaders.SateliteDataLoader import SateliteDataset, OnlyColorBands, 
 from src.models.MyNerf import MyNerf
 from src.models.Siren import Siren
 
+from src.config import device, fix_cuda
+
 
 def column(it, name):
     for d in it:
@@ -61,16 +63,17 @@ def view_bands():
 
 
 def train():
-    data = PixelsDataset("../data/sfakeone/parrot01.jpg", transform=transforms.Compose([
+    data = PixelsDataset("../data/sfakeone/og_parrot01.jpg", transform=transforms.Compose([
         ToTensor(),
         PositionalEncode(10)
     ]))
 
     train_loader = torch.utils.data.DataLoader(data,
                                                batch_size=512, shuffle=True,
-                                               num_workers=4)
+                                               num_workers=2)
     model = MyNerf(inputs=40)
-    model = Siren(inputs=40)
+    # model = Siren(inputs=40)
+    model = model.to(device)
     optim = torch.optim.Adam(params=model.parameters(), lr=0.001)
     loss = torch.nn.MSELoss()
     trainer = Trainer(model=model, optimizer=optim, loss=loss, train_loader=train_loader, test_loader=None,
@@ -89,8 +92,8 @@ def query(model):
     step = 2 / resolution
     for i, y in enumerate(np.arange(-1, 1, step)):
         for j, x in enumerate(np.arange(-1, 1, step)):
-            q = torch.tensor([x, y])
-            im[i, j, :] = (model(se.do_positional_encoding(q))).detach().numpy()
+            q = torch.tensor([x, y], device=device)
+            im[i, j, :] = (model(se.do_positional_encoding(q))).cpu().detach().numpy()
 
     return im
 
@@ -101,9 +104,11 @@ def load_checkpoint(model, path):
 
 
 if __name__ == '__main__':
+    fix_cuda()
     model = train()
-    model = Siren(inputs=40)
-    load_checkpoint(model, "./checkpoints_memorize/checkpoint_epoch_99.ckpt")
+    # model = Siren(inputs=40)
+    # model = model.to(device)
+    # load_checkpoint(model, "./checkpoints_memorize/siren_checkpoint_epoch_99.ckpt")
     im = query(model)
     plt.imshow(im)
     plt.show()

@@ -2,6 +2,8 @@ import os
 
 import torch
 
+from src.config import device
+
 
 class Trainer:
     def __init__(self, model, optimizer, loss, train_loader, test_loader, checkpoint=None, validation=None):
@@ -27,6 +29,8 @@ class Trainer:
         last_loss = 0.
         l = len(self.train_loader)
         for i, data in enumerate(self.train_loader):
+            print(f"Batch {i + 1}/{l}")
+
             # Every data instance is an input + label pair
             inputs, labels = data
 
