@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metalink xmlns="urn:ietf:params:xml:ns:metalink">
+    <file name="S2B_MSIL2A_20230613T102609_N0509_R108_T31TFJ_20230613T151004">
+        <hash type="MD5">0096eafb09a9426e394f2ff2ef06eb82</hash>
+        <size>1087659729</size>
+        <url>
+            https://scihub.copernicus.eu/dhus/odata/v1/Products('22e7d552-f8b5-46d0-b0c9-bf83e93b50d1')/$value</url>
+    </file>
+    <file name="S2B_MSIL2A_20230623T102559_N0509_R108_T31TFJ_20230623T150717">
+        <hash type="MD5">977741dd7710067d4af0cf13f73b2e85</hash>
+        <size>1175141001</size>
+        <url>
+            https://scihub.copernicus.eu/dhus/odata/v1/Products('da3eae50-8e4f-4479-91a4-e3181a65ed52')/$value</url>
+    </file>
+    <file name="S2B_MSIL2A_20230703T102609_N0509_R108_T31TFJ_20230703T132856">
+        <hash type="MD5">005e8b16e5ce81068003e681eff337a1</hash>
+        <size>1191656316</size>
+        <url>
+            https://scihub.copernicus.eu/dhus/odata/v1/Products('0f1e162a-4c1f-4c73-877d-47aa91abb240')/$value</url>
+    </file>
+    <file name="S2B_MSIL2A_20230713T102649_N0509_R108_T31TFJ_20230713T183017">
+        <hash type="MD5">5689ef8f0bc35accf3fecf141f30829c</hash>
+        <size>1194835830</size>
+        <url>
+            https://scihub.copernicus.eu/dhus/odata/v1/Products('59488061-b2de-4feb-a107-7db54b751f5f')/$value</url>
+    </file>
+    <file name="S2B_MSIL2A_20230723T102609_N0509_R108_T31TFJ_20230723T133131">
+        <hash type="MD5">0a0172dd558bb3a11fd95956466cc48a</hash>
+        <size>1192996463</size>
+        <url>
+            https://scihub.copernicus.eu/dhus/odata/v1/Products('d9584cdf-6501-4f81-af48-0a468edc6eea')/$value</url>
+    </file>
+    <file name="S2B_MSIL2A_20230802T102609_N0509_R108_T31TFJ_20230802T143038">
+        <hash type="MD5">2ca9256fb39d3633f83fa45880c9f70f</hash>
+        <size>1185637249</size>
+        <url>
+            https://scihub.copernicus.eu/dhus/odata/v1/Products('dc7b9e58-d574-4c4f-bfa8-b0811b2ee5d1')/$value</url>
+    </file>
+    <file name="S2B_MSIL2A_20230812T102609_N0509_R108_T31TFJ_20230812T150144">
+        <hash type="MD5">491f261b7fa2a39e6c23d521d16b6bf1</hash>
+        <size>1186708112</size>
+        <url>
+            https://scihub.copernicus.eu/dhus/odata/v1/Products('fa4ee85a-91bd-420a-9b70-9865ff091261')/$value</url>
+    </file>
+    <file name="S2B_MSIL2A_20230822T102609_N0509_R108_T31TFJ_20230822T134623.zip">
+        <hash type="MD5">804d25bf2d9ed6f646db4ebe099f55b4</hash>
+        <size>1189962080</size>
+        <url>
+            https://scihub.copernicus.eu/dhus/odata/v1/Products('24eb0f83-3a21-479c-8f25-8f7832779637')/$value</url>
+    </file>
+    <file name="S2B_MSIL2A_20230901T102609_N0509_R108_T31TFJ_20230901T134813.zip">
+        <hash type="MD5">65590058fe36e704e9d51c39339df5d7</hash>
+        <size>1147563884</size>
+        <url>
+            https://scihub.copernicus.eu/dhus/odata/v1/Products('e6aae32f-8b4f-4ae2-93a6-159b1a4a95b9')/$value</url>
+    </file>
+    <file name="S2B_MSIL2A_20230911T102609_N0509_R108_T31TFJ_20230911T134941.zip">
+        <hash type="MD5">e38f22e2645f4fb79c8f1f8c37da04df</hash>
+        <size>1189007541</size>
+        <url>
+            https://scihub.copernicus.eu/dhus/odata/v1/Products('277581a5-35f5-49b2-ba22-7603162f3e9e')/$value</url>
+    </file>
+</metalink>

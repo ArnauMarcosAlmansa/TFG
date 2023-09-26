@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import rasterio
 import os
 import numpy as np
@@ -6,14 +7,18 @@ from src.config import device
 
 
 class SateliteDataset:
-    def __init__(self, path, transform=None):
+    def __init__(self, path, transform=None, decimate=None):
         self.transform = transform
         self.points = []
-        tif_filenames = [filename for filename in os.listdir(path) if filename.endswith(".jpg")]
+
+        if decimate == None:
+            decimate = 1
+
+        tif_filenames = [filename for filename in os.listdir(path) if filename.endswith(".tif")]
         for month, filename in enumerate(sorted(tif_filenames)):
             im = rasterio.open(path + filename).read()
-            for y in range(im.shape[0]):
-                for x in range(im.shape[1]):
+            for y in range(0, im.shape[0], decimate):
+                for x in range(0, im.shape[1], decimate):
                     bands = im[:, y, x]
                     self.points.append({'x': x, 'y': y, 'month': month, 'bands': bands})
 
@@ -33,7 +38,7 @@ class SateliteDataset:
         for p in self.points:
             p['x'] = ((p['x'] - min_x) / max_x - 0.5) * 2
             p['y'] = ((p['y'] - min_y) / max_y - 0.5) * 2
-            p['month'] = p['month'] / 12
+            p['month'] = p['month'] / 12 * 2 * np.pi
             p['bands'] = p['bands'].astype(np.float32) / max_color
 
     def __len__(self):

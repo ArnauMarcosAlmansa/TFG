@@ -113,13 +113,15 @@ def load_image(filename):
 
 
 def train():
-    # x, y = generate_data()
-    # model = RGB2GRAY()
-    # loss_fn = torch.nn.MSELoss()
-    # optimizer = torch.optim.Adam(params=model.parameters(), lr=0.01)
-    # trainer = Trainer(model=model, optimizer=optimizer, loss=loss_fn)
-    # trainer.train(x, y, 1000)
+    x, y = generate_data()
+    model = RGB2GRAY()
+    loss_fn = torch.nn.MSELoss()
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=0.01)
+    trainer = Trainer(model=model, optimizer=optimizer, loss=loss_fn)
+    trainer.train(x, y, 1000)
 
+
+    exit()
 
     x, y = load_monalisa()
     model = Styler(width=200)

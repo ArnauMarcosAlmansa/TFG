@@ -6,7 +6,7 @@ import torch.nn
 import torch.nn.functional as F
 from matplotlib import pyplot as plt
 
-from models.trainer import Trainer, CheckPoint, Validation
+from src.models.trainer import Trainer, CheckPoint, Validation
 import os
 import rasterio
 from torchvision import transforms
@@ -59,11 +59,11 @@ def view_bands():
 
 
 def train():
-    data = SateliteDataset("../data/sfakeone/", transform=transforms.Compose([
+    data = SateliteDataset("../data/s2/", transform=transforms.Compose([
         ToTensor(),
         OnlyColorBands(),
         PositionalEncode(10)
-    ]))
+    ]), decimate=4)
 
     # train_data, test_data = torch.utils.data.random_split(data, [0.8, 0.2])
     #
@@ -76,7 +76,7 @@ def train():
     #                                           num_workers=4)
 
     train_loader = torch.utils.data.DataLoader(data,
-                                               batch_size=512, shuffle=True,
+                                               batch_size=32, shuffle=True,
                                                num_workers=4)
 
     # for im in train_loader:
@@ -90,20 +90,20 @@ def train():
     trainer = Trainer(model=model, optimizer=optim, loss=loss, train_loader=train_loader, test_loader=None,
                       checkpoint=CheckPoint("./checkpoints/"), validation=None)
 
-    trainer.train(100)
+    trainer.train(500)
 
     return model
 
 
-def query(model):
+def query(model, when):
     model.eval()
-    resolution = 5
+    resolution = 15
     im = np.zeros((resolution, resolution, 3))
     se = PositionalEncode(10)
     step = 2 / resolution
     for i, y in enumerate(np.arange(-1, 1, step)):
         for j, x in enumerate(np.arange(-1, 1, step)):
-            q = torch.tensor([x, y, 1])
+            q = torch.tensor([x, y, when])
             im[i, j, :] = (model(se.do_positional_encoding(q))).detach().numpy()
 
     return im
@@ -125,6 +125,7 @@ if __name__ == '__main__':
     model = train()
     # model = MyNerf()
     # load_checkpoint(model, "/home/arnau/workspace/UAB/TFG/src/models/checkpoints/siren_checkpoint_epoch_99.ckpt")
-    im = query(model)
-    plt.imshow(im)
-    plt.show()
+    for t in np.arange(0, 1, 1/12):
+        im = query(model, t)
+        plt.imshow(im)
+        plt.show()

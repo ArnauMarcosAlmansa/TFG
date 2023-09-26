@@ -12,8 +12,9 @@ import rasterio
 from torchvision import transforms
 import seaborn as sns
 
-from src.dataloaders.PixelsDataloader import PixelsDataset, ToTensor
+from src.dataloaders.PixelsDataloader import PixelsDataset
 from src.dataloaders.SateliteDataLoader import SateliteDataset, OnlyColorBands, PositionalEncode
+from src.dataloaders.VideoPixelsDataloader import VideoPixelsDataset, ToTensor
 from src.models.MyNerf import MyNerf
 from src.models.Siren import Siren
 
@@ -46,7 +47,7 @@ def view_data():
     data = SateliteDataset("../../data/s2/")
 
     loader = torch.utils.data.DataLoader(data,
-                                         batch_size=5, shuffle=True,
+                                         batch_size=512, shuffle=True,
                                          num_workers=4)
 
     for m in column(loader, 'bands'):
@@ -63,15 +64,15 @@ def view_bands():
 
 
 def train():
-    data = PixelsDataset("../data/sfakeone/og_parrot01.jpg", transform=transforms.Compose([
+    data = VideoPixelsDataset("./data/videos/20230926Hemisfericos24h.mp4", transform=transforms.Compose([
         ToTensor(),
         PositionalEncode(10)
-    ]))
+    ]), decimate=10, every_n=20)
 
     train_loader = torch.utils.data.DataLoader(data,
                                                batch_size=512, shuffle=True,
-                                               num_workers=2)
-    model = MyNerf(inputs=40)
+                                               num_workers=0)
+    model = MyNerf(inputs=60)
     # model = Siren(inputs=40)
     model = model.to(device)
     optim = torch.optim.Adam(params=model.parameters(), lr=0.001)
