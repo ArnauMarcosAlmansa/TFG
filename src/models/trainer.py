@@ -1,8 +1,10 @@
 import os
 
+import numpy as np
 import torch
 
 from src.config import device
+from src.dataloaders.SateliteDataLoader import PositionalEncode
 
 
 class Trainer:
@@ -55,21 +57,46 @@ class Trainer:
 
 class RenderLossTrainer(Trainer):
 
+    def __init__(self, model, optimizer, loss, train_loader, test_loader, *, height, width, **kwargs):
+        super().__init__(model, optimizer, loss, train_loader, test_loader, **kwargs)
+        self.height = height
+        self.width = width
+
     def train_one_epoch(self, epoch):
-        # Zero your gradients for every batch!
-        self.optimizer.zero_grad()
+        running_loss = 0.0
+        for i, data in enumerate(self.train_loader):
+            timestamp, image = data
 
-        # Compute the loss and its gradients
-        loss = self.loss(self.model)
-        loss.backward()
+            # Zero your gradients for every batch!
+            self.optimizer.zero_grad()
 
-        # Adjust learning weights
-        self.optimizer.step()
+            outputs = self.render(self.model, timestamp)
 
-        # Gather data and report
-        running_loss = loss.item()
+            # Compute the loss and its gradients
+            loss = self.loss(outputs, image)
+            loss.backward()
+
+            # Adjust learning weights
+            self.optimizer.step()
+
+            # Gather data and report
+            running_loss += loss.item()
 
         return running_loss
+
+    def render(self, model, when):
+        model.eval()
+        im = torch.zeros((self.height, self.width, 12))
+        se = PositionalEncode(10)
+        v_step = 2 / self.height
+        h_step = 2 / self.width
+        for i, y in enumerate(np.arange(-1, 1, v_step)):
+            for j, x in enumerate(np.arange(-1, 1, h_step)):
+                q = torch.tensor([x, y, when])
+                im[i, j, :] = (model(se.do_positional_encoding(q)))
+
+        return im
+
 
 class CheckPoint:
     def __init__(self, base_path):

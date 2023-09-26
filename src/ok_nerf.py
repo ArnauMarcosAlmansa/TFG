@@ -77,9 +77,9 @@ def train():
     # model = Siren(inputs=40)
     model = model.to(device)
     optim = torch.optim.Adam(params=model.parameters(), lr=0.001)
-    loss = TimedRenderLoss(60, 60, train_loader)
+    loss = torch.nn.MSELoss()
     trainer = RenderLossTrainer(model=model, optimizer=optim, loss=loss, train_loader=train_loader, test_loader=None,
-                      checkpoint=CheckPoint("./checkpoints_memorize/"), validation=None)
+                      checkpoint=CheckPoint("./checkpoints_memorize/"), validation=None, height=60, width=60)
 
     trainer.train(100)
 

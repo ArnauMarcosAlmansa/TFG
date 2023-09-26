@@ -10,3 +10,8 @@
 
 - [Learn PyTorch](https://www.learnpytorch.io/)
 
+
+
+# Datasets
+
+- [Rapidai4eo documentation](https://radiantearth.blob.core.windows.net/mlhub/rapidai4eo/documentation.pdf)
