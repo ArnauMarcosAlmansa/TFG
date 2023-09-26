@@ -53,6 +53,24 @@ class Trainer:
         return running_loss / l
 
 
+class RenderLossTrainer(Trainer):
+
+    def train_one_epoch(self, epoch):
+        # Zero your gradients for every batch!
+        self.optimizer.zero_grad()
+
+        # Compute the loss and its gradients
+        loss = self.loss(self.model)
+        loss.backward()
+
+        # Adjust learning weights
+        self.optimizer.step()
+
+        # Gather data and report
+        running_loss = loss.item()
+
+        return running_loss
+
 class CheckPoint:
     def __init__(self, base_path):
         self.base_path = base_path
