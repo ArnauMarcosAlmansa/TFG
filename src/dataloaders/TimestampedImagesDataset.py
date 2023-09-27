@@ -1,5 +1,6 @@
 import os
 
+import cv2
 import numpy as np
 import rasterio
 
@@ -11,7 +12,8 @@ class TimestampedImagesDataset:
 
         tif_filenames = [filename for filename in os.listdir(path) if filename.endswith(".tif")]
         for month, filename in enumerate(sorted(tif_filenames)):
-            im = rasterio.open(path + filename).read().transpose((1, 2, 0)).astype(np.float32) / 1000
+            im = rasterio.open(path + filename).read().transpose((1, 2, 0)).astype(np.float32)[:, :, 0:3] / 1000
+            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
             self.timestamped_images.append({'timestamp': month / 12, 'image': im})
 
     def __len__(self):

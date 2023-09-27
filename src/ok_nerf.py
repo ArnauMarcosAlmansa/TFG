@@ -73,7 +73,7 @@ def train():
     train_loader = torch.utils.data.DataLoader(data,
                                                batch_size=1, shuffle=True,
                                                num_workers=0)
-    model = MyNerf(inputs=60, outputs=12)
+    model = MyNerf(inputs=60, outputs=3)
     # model = Siren(inputs=40)
     model = model.to(device)
     optim = torch.optim.Adam(params=model.parameters(), lr=0.001)
@@ -86,7 +86,7 @@ def train():
     return model
 
 
-def query(model):
+def query(model, when):
     model.eval()
     resolution = 100
     im = np.zeros((resolution, resolution, 3))
@@ -94,7 +94,7 @@ def query(model):
     step = 2 / resolution
     for i, y in enumerate(np.arange(-1, 1, step)):
         for j, x in enumerate(np.arange(-1, 1, step)):
-            q = torch.tensor([x, y], device=device)
+            q = torch.tensor([x, y, when], device=device)
             im[i, j, :] = (model(se.do_positional_encoding(q))).cpu().detach().numpy()
 
     return im
@@ -111,6 +111,6 @@ if __name__ == '__main__':
     # model = Siren(inputs=40)
     # model = model.to(device)
     # load_checkpoint(model, "./checkpoints_memorize/siren_checkpoint_epoch_99.ckpt")
-    im = query(model)
+    im = query(model, 0.5)
     plt.imshow(im)
     plt.show()

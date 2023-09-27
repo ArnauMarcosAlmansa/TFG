@@ -64,16 +64,19 @@ class RenderLossTrainer(Trainer):
 
     def train_one_epoch(self, epoch):
         running_loss = 0.0
+        l = len(self.train_loader)
         for i, data in enumerate(self.train_loader):
             timestamp, image = data
 
             # Zero your gradients for every batch!
             self.optimizer.zero_grad()
 
+            print(f"Rendering {i + 1}/{l}")
             outputs = self.render(self.model, timestamp)
 
+            print(f"Computing loss {i + 1}/{l}")
             # Compute the loss and its gradients
-            loss = self.loss(outputs, image)
+            loss = self.loss(outputs, image.squeeze())
             loss.backward()
 
             # Adjust learning weights
@@ -82,11 +85,13 @@ class RenderLossTrainer(Trainer):
             # Gather data and report
             running_loss += loss.item()
 
-        return running_loss
+            print(f"Done {i + 1}/{l}")
+
+        return running_loss / l
 
     def render(self, model, when):
         model.eval()
-        im = torch.zeros((self.height, self.width, 12))
+        im = torch.zeros((self.height, self.width, 3))
         se = PositionalEncode(10)
         v_step = 2 / self.height
         h_step = 2 / self.width
