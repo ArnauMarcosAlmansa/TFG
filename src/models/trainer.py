@@ -111,7 +111,7 @@ class RenderLossTrainer(Trainer):
 
             print(f"Computing loss {i + 1}/{l}")
             # Compute the loss and its gradients
-            loss = self._loss(outputs, image.squeeze())
+            loss = self._loss(outputs, image.squeeze().to(device))
             loss.backward()
 
             # Adjust learning weights
@@ -128,14 +128,16 @@ class RenderLossTrainer(Trainer):
 
     def render(self, model, when):
         model.eval()
-        im = torch.zeros((self.height, self.width, 3))
-        se = PositionalEncode(10)
+        se = PositionalEncode(5)
         v_step = 2 / self.height
         h_step = 2 / self.width
+        query = torch.zeros((self.height * self.width, 30), device=device)
         for i, y in enumerate(np.arange(-1, 1, v_step)):
             for j, x in enumerate(np.arange(-1, 1, h_step)):
-                q = torch.tensor([x, y, when])
-                im[i, j, :] = (model(se.do_positional_encoding(q)))
+                q = se.do_positional_encoding(torch.tensor([x, y, when], device=device))
+                query[i * self.width + j, :] = q
+
+        im = model(query).reshape((self.height, self.width, 3))
 
         return im
 
