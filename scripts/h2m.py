@@ -1,7 +1,23 @@
 import cv2
 import numpy as np
+import rasterio
 import trimesh
 import pyrender
+
+
+# S2B_MSIL2A_20170709T094029_78_59
+
+def load_dem(filename):
+    return np.squeeze(rasterio.open(filename).read())
+
+
+def load_albedo(base_directory, name):
+    b = np.squeeze(rasterio.open(base_directory + name + "/" + name + "_B02.tif").read())
+    g = np.squeeze(rasterio.open(base_directory + name + "/" + name + "_B03.tif").read())
+    r = np.squeeze(rasterio.open(base_directory + name + "/" + name + "_B04.tif").read())
+
+    rgb = np.stack([r, g, b], -1) // 5
+    return rgb.astype(np.uint8)
 
 
 def load_image_gray(filename):
@@ -40,8 +56,8 @@ def make_triangles(points):
             vertices[vertex_index + 2] = points[y + 1, x]
 
             uvs[vertex_index] = [x / w, y / h]
-            uvs[vertex_index + 1] = [x / w, (y + 1) / h]
-            uvs[vertex_index + 2] = [(x + 1) / w, y / h]
+            uvs[vertex_index + 2] = [x / w, (y + 1) / h]
+            uvs[vertex_index + 1] = [(x + 1) / w, y / h]
 
             vertex_index += 3
 
@@ -52,8 +68,8 @@ def make_triangles(points):
             vertices[vertex_index + 2] = points[y - 1, x]
 
             uvs[vertex_index] = [x / w, y / h]
-            uvs[vertex_index + 1] = [x / w, (y - 1) / h]
-            uvs[vertex_index + 2] = [(x - 1) / w, y / h]
+            uvs[vertex_index + 2] = [x / w, (y - 1) / h]
+            uvs[vertex_index + 1] = [(x - 1) / w, y / h]
 
             vertex_index += 3
 
@@ -75,9 +91,9 @@ def make_mesh(primitives):
 
 
 if __name__ == '__main__':
-    hm = load_image_gray("./test.png")
+    hm = load_dem("/home/amarcos/Downloads/BigEarthNet-S2-v1.0/BigEarthNet-S2-v1.0/dem/S2B_MSIL2A_20170709T094029_78_59_dem.tif")
     # hm = np.array([[1, .75], [.75, 0]])
-    texture = load_image("./color.png")
+    texture = load_albedo("/home/amarcos/Downloads/BigEarthNet-S2-v1.0/BigEarthNet-S2-v1.0/BigEarthNet-v1.0/", "S2B_MSIL2A_20170709T094029_78_59")
     pts = make_points(hm)
     vrtxs, uvs = make_triangles(pts)
     mtl = make_material(texture)
@@ -86,8 +102,8 @@ if __name__ == '__main__':
 
     light = pyrender.PointLight(intensity=10.0)
 
-    fuze_trimesh = trimesh.load('./models/fuze.obj')
-    fuze_mesh = pyrender.Mesh.from_trimesh(fuze_trimesh)
+    # fuze_trimesh = trimesh.load('./models/fuze.obj')
+    # fuze_mesh = pyrender.Mesh.from_trimesh(fuze_trimesh)
 
     scene = pyrender.Scene()
     scene.add(mesh)
