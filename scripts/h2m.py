@@ -1,14 +1,36 @@
+import time
+
 import cv2
 import numpy as np
 import rasterio
 import trimesh
 import pyrender
+from matplotlib import pyplot as plt
+import colour
+
+
+class Sun:
+    def __init__(self, node: pyrender.Node):
+        self.node = node
+        self.pose = np.eye(4)
+
+    def solar_color(self, azimuth, elevation):
+        '''Aquí habria que obtener la temperatura CCT y convertirla a RGB según el momento del dia'''
+        pass
+
+    def cycle(self, when):
+        return rotx(self.pose, when), self.solar_color(0, when)
 
 
 # S2B_MSIL2A_20170709T094029_78_59
 
-def load_dem(filename):
-    return np.squeeze(rasterio.open(filename).read())
+def load_dem(filename, upscale=8, blur=17):
+    dem = np.squeeze(rasterio.open(filename).read()).astype(np.float32)
+    dem2 = cv2.resize(dem, (dem.shape[1] * upscale, dem.shape[0] * upscale))
+    dem2 = cv2.GaussianBlur(dem2, (blur, blur), 0)
+    # dem = cv2.resize(dem2, (dem.shape[1], dem.shape[0]))
+    return dem2
+
 
 
 def load_albedo(base_directory, name):
@@ -28,12 +50,12 @@ def load_image(filename):
     return cv2.cvtColor(cv2.imread(filename), cv2.COLOR_BGR2RGB)
 
 
-def make_points(image):
+def make_points(image, downscale=8):
     points = np.zeros((image.shape[0], image.shape[1], 3))
     for y in range(image.shape[0]):
         for x in range(image.shape[1]):
             z = image[image.shape[0] - y - 1, x]
-            points[y, x] = [x, y, z / 2]
+            points[y, x] = [x / downscale, y / downscale, z]
 
     return points
 
@@ -41,9 +63,6 @@ def make_points(image):
 def make_triangles(points):
     uvs = np.zeros((points.shape[0] * points.shape[1] * 3 * 2, 2))
     vertices = np.zeros((points.shape[0] * points.shape[1] * 3 * 2, 3))
-
-    inv_x = 1
-    inv_y = 1
 
     h = points.shape[0]
     w = points.shape[1]
@@ -90,28 +109,101 @@ def make_mesh(primitives):
     return pyrender.Mesh(primitives)
 
 
-if __name__ == '__main__':
-    hm = load_dem("/home/amarcos/Downloads/BigEarthNet-S2-v1.0/BigEarthNet-S2-v1.0/dem/S2B_MSIL2A_20170709T094029_78_59_dem.tif")
+def make_terrain(dem_file, bands_folder, bands_name):
+    hm = load_dem(dem_file)
     # hm = np.array([[1, .75], [.75, 0]])
-    texture = load_albedo("/home/amarcos/Downloads/BigEarthNet-S2-v1.0/BigEarthNet-S2-v1.0/BigEarthNet-v1.0/", "S2B_MSIL2A_20170709T094029_78_59")
+    texture = load_albedo(bands_folder, bands_name)
     pts = make_points(hm)
     vrtxs, uvs = make_triangles(pts)
     mtl = make_material(texture)
     prim = make_primitive(vrtxs, uvs, mtl)
     mesh = make_mesh([prim])
 
-    light = pyrender.PointLight(intensity=10.0)
+    return mesh
 
-    # fuze_trimesh = trimesh.load('./models/fuze.obj')
-    # fuze_mesh = pyrender.Mesh.from_trimesh(fuze_trimesh)
 
-    scene = pyrender.Scene()
+def rotx(pose, a):
+    rot = np.eye(4)
+    rot[1, 1] = np.cos(a)
+    rot[1, 2] = -np.sin(a)
+    rot[2, 1] = np.sin(a)
+    rot[2, 2] = np.cos(a)
+    return np.dot(rot, pose)
+
+
+def roty(pose, a):
+    rot = np.eye(4)
+    rot[0, 0] = np.cos(a)
+    rot[0, 2] = np.sin(a)
+    rot[2, 0] = -np.sin(a)
+    rot[2, 2] = np.cos(a)
+    return np.dot(rot, pose)
+
+
+def rotz(pose, a):
+    rot = np.eye(4)
+    rot[0, 0] = np.cos(a)
+    rot[0, 1] = -np.sin(a)
+    rot[1, 0] = np.sin(a)
+    rot[1, 1] = np.cos(a)
+    return np.dot(rot, pose)
+
+
+if __name__ == '__main__':
+    mesh = make_terrain(
+        "/home/amarcos/Downloads/BigEarthNet-S2-v1.0/BigEarthNet-S2-v1.0/dem/S2B_MSIL2A_20170709T094029_78_59_dem.tif",
+        "/home/amarcos/Downloads/BigEarthNet-S2-v1.0/BigEarthNet-S2-v1.0/BigEarthNet-v1.0/",
+        "S2B_MSIL2A_20170709T094029_78_59"
+    )
+
+    light = pyrender.DirectionalLight(intensity=10)
+    # cam = pyrender.PerspectiveCamera(1, 0.05, 1000.0)
+
+    scene = pyrender.Scene(ambient_light=np.array([1.0, 1.0, 1.0]))
+    # scene = pyrender.Scene()
     scene.add(mesh)
-    # scene.add(fuze_mesh)
-    scene.add(light, pose=np.array([
-        [1, 0, 0, 0],
-        [0, 1, 0, 0],
-        [0, 0, 1, 10],
-        [0, 0, 0, 1],
-    ]))
-    pyrender.Viewer(scene, use_raymond_lighting=True, render_flags={'shadows': False})
+    #     scene.add(cam)
+    # sunlight = scene.add(light, pose=rotx(np.eye(4), np.pi / 2 - 0.3))
+    sunlight = scene.add(light, pose=rotx(np.eye(4), 0))
+    # pyrender.Viewer(scene, render_flags={'shadows': True})
+    #
+    # exit()
+
+    sun = Sun(sunlight)
+
+    # camera = pyrender.PerspectiveCamera(yfov=np.pi / 3.0, aspectRatio=1.0)
+    camera = pyrender.OrthographicCamera(100, 100, zfar=1000)
+    s = np.sqrt(2) / 2
+    camera_pose = np.array([
+        [1.0, 0, 0, 60],
+        [.0, 1.0, 0.0, 60.0],
+        [0.0, 0, 1, 400],
+        [0.0, 0.0, 0.0, 1.0],
+    ])
+    camn = scene.add(camera, pose=camera_pose)
+    r = pyrender.OffscreenRenderer(400, 400)
+
+    for a in np.arange(0, np.pi, 0.1):
+        # scene.set_pose(camn, rotz(np.array([
+        #     [1, 0, 0, 60],
+        #     [0, 1, 0.0, 60.0],
+        #     [0.0, 0, 1.0, 400],
+        #     [0.0, 0.0, 0.0, 1.0],
+        # ]), a))
+
+        sunpose, ambient = sun.cycle(a)
+
+        scene.ambient_light = ambient
+        scene.set_pose(sun.node, sunpose)
+
+        time.sleep(0.5)
+
+        color, depth = r.render(scene)
+        plt.figure()
+        plt.imshow(color)
+        plt.show()
+        # plt.figure()
+        # plt.imshow(depth, cmap=plt.cm.gray_r)
+        # plt.show()
+
+    print()
