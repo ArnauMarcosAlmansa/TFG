@@ -6,7 +6,8 @@ import rasterio
 import trimesh
 import pyrender
 from matplotlib import pyplot as plt
-import colour
+import pickle
+
 
 
 class Sun:
@@ -14,12 +15,12 @@ class Sun:
         self.node = node
         self.pose = np.eye(4)
 
-    def solar_color(self, azimuth, elevation):
+    def solar_color(self, when):
         '''Aquí habria que obtener la temperatura CCT y convertirla a RGB según el momento del dia'''
-        pass
+        return np.clip(np.sin(np.ones(3) * when), 0, 1)
 
     def cycle(self, when):
-        return rotx(self.pose, when), self.solar_color(0, when)
+        return rotx(self.pose, when), self.solar_color(when)
 
 
 # S2B_MSIL2A_20170709T094029_78_59
@@ -149,6 +150,45 @@ def rotz(pose, a):
     return np.dot(rot, pose)
 
 
+def camera_poses():
+    base_pose = np.array([
+        [1.0, 0.0, 0.0, 60],
+        [0.0, 1.0, 0.0, 60.0],
+        [0.0, 0.0, 1.0, 300],
+        [0.0, 0.0, 0.0, 1.0],
+    ])
+
+    for x in np.arange(-0.1, 0.1, 0.05):
+        for y in np.arange(-0.1, 0.1, 0.05):
+            for z in np.arange(-0.1, 0.1, 0.05):
+                yield rotx(roty(rotz(base_pose, z), y), x), f"{x:.4f}_{y:.4f}_{z:.4f}"
+
+
+def day():
+    for t in np.arange(0, np.pi, 0.1):
+        yield t, f"{t:.4f}"
+
+
+def pkl_save(obj, filename):
+    with open(filename, 'wb') as f:
+        pickle.dump(obj, f)
+
+
+def generate_eo_dataset(scene, renderer):
+    image_index = 1
+
+    for pose, posename in camera_poses():
+        scene.set_pose(camn, pose)
+
+        color, depth = renderer.render(scene)
+
+        bgr = cv2.cvtColor(color, cv2.COLOR_RGB2BGR)
+        cv2.imwrite(f"/home/amarcos/workspace/TFG/scripts/generated_eo_data/{image_index:010d}.png", bgr)
+        pkl_save({'camera_pose': pose, 'sunpose': np.eye(4)}, f"/home/amarcos/workspace/TFG/scripts/generated_eo_data/{image_index:010d}.pkl")
+
+        image_index += 1
+
+
 if __name__ == '__main__':
     mesh = make_terrain(
         "/home/amarcos/Downloads/BigEarthNet-S2-v1.0/BigEarthNet-S2-v1.0/dem/S2B_MSIL2A_20170709T094029_78_59_dem.tif",
@@ -172,38 +212,17 @@ if __name__ == '__main__':
     sun = Sun(sunlight)
 
     # camera = pyrender.PerspectiveCamera(yfov=np.pi / 3.0, aspectRatio=1.0)
-    camera = pyrender.OrthographicCamera(100, 100, zfar=1000)
+    camera = pyrender.OrthographicCamera(40, 40, zfar=1000)
     s = np.sqrt(2) / 2
     camera_pose = np.array([
         [1.0, 0, 0, 60],
         [.0, 1.0, 0.0, 60.0],
-        [0.0, 0, 1, 400],
+        [0.0, 0, 1, 300],
         [0.0, 0.0, 0.0, 1.0],
     ])
     camn = scene.add(camera, pose=camera_pose)
-    r = pyrender.OffscreenRenderer(400, 400)
+    r = pyrender.OffscreenRenderer(240, 240)
 
-    for a in np.arange(0, np.pi, 0.1):
-        # scene.set_pose(camn, rotz(np.array([
-        #     [1, 0, 0, 60],
-        #     [0, 1, 0.0, 60.0],
-        #     [0.0, 0, 1.0, 400],
-        #     [0.0, 0.0, 0.0, 1.0],
-        # ]), a))
-
-        sunpose, ambient = sun.cycle(a)
-
-        scene.ambient_light = ambient
-        scene.set_pose(sun.node, sunpose)
-
-        time.sleep(0.5)
-
-        color, depth = r.render(scene)
-        plt.figure()
-        plt.imshow(color)
-        plt.show()
-        # plt.figure()
-        # plt.imshow(depth, cmap=plt.cm.gray_r)
-        # plt.show()
+    generate_eo_dataset(scene, r)
 
     print()
