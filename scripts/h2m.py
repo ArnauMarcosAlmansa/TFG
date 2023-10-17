@@ -189,6 +189,10 @@ def generate_eo_dataset(scene, renderer):
         image_index += 1
 
 
+def interact(scene):
+    pyrender.Viewer(scene)
+
+
 if __name__ == '__main__':
     mesh = make_terrain(
         "/home/amarcos/Downloads/BigEarthNet-S2-v1.0/BigEarthNet-S2-v1.0/dem/S2B_MSIL2A_20170709T094029_78_59_dem.tif",
@@ -211,8 +215,8 @@ if __name__ == '__main__':
 
     sun = Sun(sunlight)
 
-    # camera = pyrender.PerspectiveCamera(yfov=np.pi / 3.0, aspectRatio=1.0)
-    camera = pyrender.OrthographicCamera(40, 40, zfar=1000)
+    camera = pyrender.PerspectiveCamera(yfov=1, aspectRatio=1.0)
+    # camera = pyrender.OrthographicCamera(40, 40, zfar=1000)
     s = np.sqrt(2) / 2
     camera_pose = np.array([
         [1.0, 0, 0, 60],
@@ -223,6 +227,7 @@ if __name__ == '__main__':
     camn = scene.add(camera, pose=camera_pose)
     r = pyrender.OffscreenRenderer(240, 240)
 
+    # interact(scene)
     generate_eo_dataset(scene, r)
 
     print()
