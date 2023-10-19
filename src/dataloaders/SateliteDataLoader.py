@@ -14,11 +14,11 @@ class SateliteDataset:
         if decimate == None:
             decimate = 1
 
-        tif_filenames = [filename for filename in os.listdir(path) if filename.endswith(".tif")]
-        for month, filename in enumerate(sorted(tif_filenames)):
+        tif_filenames = sorted([filename for filename in os.listdir(path) if filename.endswith(".tif")])
+        for month, filename in enumerate(tif_filenames):
             im = rasterio.open(path + filename).read()
-            for y in range(0, im.shape[0], decimate):
-                for x in range(0, im.shape[1], decimate):
+            for y in range(0, im.shape[1], decimate):
+                for x in range(0, im.shape[2], decimate):
                     bands = im[:, y, x]
                     self.points.append({'x': x, 'y': y, 'month': month, 'bands': bands})
 
@@ -61,7 +61,7 @@ class OnlyOneBand:
 class OnlyColorBands:
     def __call__(self, data):
         inputs, labels = data
-        labels = torch.tensor([labels[2], labels[1], labels[0]])
+        labels = torch.tensor([labels[2], labels[1], labels[0]], device=device)
         return inputs, labels
 
 
@@ -89,8 +89,8 @@ class NormalizeDict:
 
 class ToTensor:
     def __call__(self, item):
-        return torch.tensor([float(item['x']), float(item['y']), float(item['month'])]), torch.tensor(
-            item['bands'].astype(np.float32))
+        return torch.tensor([float(item['x']), float(item['y']), float(item['month'])], device=device), torch.tensor(
+            item['bands'].astype(np.float32), device=device)
 
 
 class PositionalEncode:

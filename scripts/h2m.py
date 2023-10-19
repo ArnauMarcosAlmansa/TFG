@@ -225,7 +225,7 @@ if __name__ == '__main__':
         [0.0, 0.0, 0.0, 1.0],
     ])
     camn = scene.add(camera, pose=camera_pose)
-    r = pyrender.OffscreenRenderer(240, 240)
+    r = pyrender.OffscreenRenderer(80, 80)
 
     # interact(scene)
     generate_eo_dataset(scene, r)
