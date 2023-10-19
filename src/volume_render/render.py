@@ -163,28 +163,20 @@ class Renderer:
         rays_d = rays_d / self.n_samples
 
         sh = rays_d.shape  # [..., 3]
-        slices = []
         # que el step sea un poco aleatorio para evitar overfitting
         step = (far - near) / self.n_samples
-        for i in range(self.n_samples):
+        density2alpha = lambda raw, dists, act_fn=F.relu: 1. - t.exp(-act_fn(raw) * step)
+        rgb = t.zeros((80, 80, 3)).to(device)
+        for i in range(self.n_samples - 1, -1, -1):
             points = rays_o + rays_d * step * i
             distance_slice = t.dist(points, rays_o)
 
             rgb_slice, density_slice = self.sampler(t.reshape(points, (sh[0] * sh[1], sh[2])))
-            rgb_slice = t.reshape(t.sigmoid(rgb_slice), (240, 240, 3))
-            density_slice = t.reshape(t.relu(density_slice), (240, 240, 1))
+            rgb_slice = t.reshape(t.sigmoid(rgb_slice), (80, 80, 3))
+            density_slice = t.reshape(t.relu(density_slice), (80, 80, 1))
 
-            slices.append((rgb_slice, density_slice, distance_slice))
-
-        density2alpha = lambda raw, dists, act_fn=F.relu: 1. - t.exp(-act_fn(raw) * step)
-        rgb = t.zeros_like(rgb_slice)
-        for rgb_slice, density_slice, distance_slice in slices[::-1]:
             alpha_slice = density2alpha(density_slice, distance_slice)
-            # print(f"RGB_SLICE ({rgb_slice.min()}, {rgb_slice.max()})")
-            # print(f"DENSITY_SLICE ({density_slice.min()}, {density_slice.max()})")
-            # print(f"ALPHA_SLICE ({alpha_slice.min()}, {alpha_slice.max()})")
             rgb = (1 - alpha_slice) * rgb + alpha_slice * rgb_slice
-            # print(f"RGB ({rgb.min()}, {rgb.max()})")
 
         return rgb
 
@@ -215,14 +207,10 @@ class Sin(t.nn.Module):
 class Test(t.nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        width = 512
+        width = 256
         self.encode = PositionalEncode(10)
         self.block1 = t.nn.Sequential(
             t.nn.Linear(60, width),
-            t.nn.ReLU(),
-            t.nn.Linear(width, width),
-            t.nn.ReLU(),
-            t.nn.Linear(width, width),
             t.nn.ReLU(),
             t.nn.Linear(width, width),
             t.nn.ReLU(),
@@ -237,13 +225,9 @@ class Test(t.nn.Module):
         self.block2 = t.nn.Sequential(
             t.nn.Linear(width + 60, width),
             t.nn.ReLU(),
-            t.nn.Linear(width, width),
+            t.nn.Linear(width, width // 2),
             t.nn.ReLU(),
-            t.nn.Linear(width, width),
-            t.nn.ReLU(),
-            t.nn.Linear(width, width),
-            t.nn.ReLU(),
-            t.nn.Linear(width, 4),
+            t.nn.Linear(width // 2, 4),
         )
 
     def forward(self, x):
@@ -260,11 +244,11 @@ if __name__ == '__main__':
 
     loader = torch.utils.data.DataLoader(data, shuffle=True, batch_size=1)
 
-    c = PinholeCamera(240, 240, 50, t.eye(4))
+    c = PinholeCamera(80, 80, 50, t.eye(4))
     model = Test().to(device)
     loss = t.nn.MSELoss()
     optim = t.optim.Adam(params=model.parameters(), lr=0.001)
-    r = Renderer(c, model, 10)
+    r = Renderer(c, model, 100)
     model.train()
     for i in range(10000):
         running_loss = 0
@@ -273,13 +257,13 @@ if __name__ == '__main__':
             im, d = data
             c.pose = d['camera_pose'].squeeze()
 
-            model.zero_grad()
             image = r.render()
+            model.zero_grad()
             l = loss(image, im.squeeze())
             l.backward()
-
-            running_loss += l
             optim.step()
+            running_loss += l
+
         print(f"LOSS = {running_loss / len(loader):.5f}")
         print(f"ENDING EPOCH {i + 1}")
 
