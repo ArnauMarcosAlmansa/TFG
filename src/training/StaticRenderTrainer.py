@@ -15,18 +15,18 @@ class StaticRenderTrainer(Trainer):
         running_loss = 0.0
         l = len(self.train_loader)
         for i, data in enumerate(self.train_loader):
-            image, d = data
+            colors, rays_o, rays_d, d = data
 
             # Zero your gradients for every batch!
             self._optimizer.zero_grad()
 
             print(f"Rendering {i + 1}/{l}")
             self.renderer.camera.pose = d['camera_pose'].squeeze()
-            outputs = self.renderer.render()
+            outputs = self.renderer.render_arbitrary_rays(rays_o, rays_d)
 
             print(f"Computing loss {i + 1}/{l}")
             # Compute the loss and its gradients
-            loss = self._loss(outputs, image.squeeze().to(device))
+            loss = self._loss(outputs, colors.squeeze().to(device))
             loss.backward()
 
             # Adjust learning weights
