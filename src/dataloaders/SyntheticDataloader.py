@@ -37,9 +37,13 @@ class SyntheticEODataset:
             camera = PinholeCamera(im.shape[1], im.shape[0], 50, torch.from_numpy(data['camera_pose']))
             rays_o, rays_d = camera.get_rays()
 
+            sunpose = torch.from_numpy(data['sun_pose'].astype(np.float32)).squeeze()[0:3, 0:3]
+            x_forward = torch.tensor([1.0, 0.0, 0.0])
+            sun_dir = torch.matmul(sunpose, x_forward)
+
             for i in range(im.shape[0]):
                 for j in range(im.shape[1]):
-                    self.pixels.append((torch.from_numpy(im[i, j]).to(device), rays_o[i, j], rays_d[i, j], data))
+                    self.pixels.append((torch.from_numpy(im[i, j]).to(device), rays_o[i, j], rays_d[i, j], sun_dir, data))
 
             print(f"Loaded {num + 1}/{len(png_filenames)}")
 

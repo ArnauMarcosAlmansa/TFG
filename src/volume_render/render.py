@@ -1,3 +1,5 @@
+import copy
+
 import imageio
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,16 +12,20 @@ from src.models.layers.PositionalEncode import PositionalEncode
 from src.training.StaticRenderTrainer import StaticRenderTrainer
 from src.training.decorators.Checkpoint import Checkpoint
 from src.volume_render.cameras.PinholeCamera import PinholeCamera
-from src.volume_render.Renderer import Renderer
+from src.volume_render.SimpleRenderer import SimpleRenderer
 
 
 class Test(t.nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        width = 100
+        width = 256
         self.encode = PositionalEncode(10)
         self.block1 = t.nn.Sequential(
             t.nn.Linear(60, width),
+            t.nn.ReLU(),
+            t.nn.Linear(width, width),
+            t.nn.ReLU(),
+            t.nn.Linear(width, width),
             t.nn.ReLU(),
             t.nn.Linear(width, width),
             t.nn.ReLU(),
@@ -33,6 +39,8 @@ class Test(t.nn.Module):
 
         self.block2 = t.nn.Sequential(
             t.nn.Linear(width + 60, width),
+            t.nn.ReLU(),
+            t.nn.Linear(width, width),
             t.nn.ReLU(),
             t.nn.Linear(width, width // 2),
             t.nn.ReLU(),
@@ -52,20 +60,20 @@ if __name__ == '__main__':
 
     data = SyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_eo_data/")
 
-    loader = torch.utils.data.DataLoader(data, shuffle=True, batch_size=1024 * 10)
+    loader = torch.utils.data.DataLoader(data, shuffle=True, batch_size=1024 * 8)
 
     torch.no_grad()
 
-    c = PinholeCamera(240, 240, 50, t.eye(4))
+    c = PinholeCamera(1024, 1024, 50, t.eye(4))
     model = Test().to(device)
     loss = t.nn.MSELoss()
     optim = t.optim.Adam(params=model.parameters(), lr=0.001, betas=(0.9, 0.999))
-    r = Renderer(c, model, 100)
+    r = SimpleRenderer(c, model, 100)
 
-    trainer = StaticRenderTrainer(model, optim, loss, loader, 'STATIC_RENDERED_PIXELS', renderer=r)
+    trainer = StaticRenderTrainer(model, optim, loss, loader, 'STATIC_RENDERED_PIXELS_NOBACKGROUND', renderer=r)
     trainer = Checkpoint(trainer, "./checkpoints_staticrender/")
 
-    trainer.train(1000)
+    trainer.train(0)
 
     torch.no_grad()
     model.eval()
@@ -76,13 +84,15 @@ if __name__ == '__main__':
     c.pose = pose[0]
     images = []
 
-    import gc
-
-    for o in np.arange(-0.1, 0.1, 0.02):
-        c.pose[0, 3] = o
-        im = r.render()
-        images.append((im.detach().cpu().numpy() * 255).astype(np.uint8))
+    for o in np.arange(-0.001, 0.001, 0.0002):
+        print(o)
+        c.pose = copy.deepcopy(pose[0])
+        c.pose[0, 3] += o
+        im = r.render_depth()
+        im = (im - im.min()) / (im.max() - im.min())
+        im = (im.detach().cpu().numpy() * 255).astype(np.uint8)
+        images.append(im)
         plt.imshow(images[-1])
         plt.show()
 
-    imageio.mimsave('video_render_test.gif', images, duration=2000)
+    imageio.mimsave('video_render_test.gif', images, duration=100)

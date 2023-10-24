@@ -20,7 +20,7 @@ class Sun:
         return np.clip(np.sin(np.ones(3) * when), 0, 1)
 
     def cycle(self, when):
-        return rotx(self.pose, when), self.solar_color(when)
+        return rotx(self.pose,  when - np.pi / 2), self.solar_color(when)
 
 
 # S2B_MSIL2A_20170709T094029_78_59
@@ -51,12 +51,12 @@ def load_image(filename):
     return cv2.cvtColor(cv2.imread(filename), cv2.COLOR_BGR2RGB)
 
 
-def make_points(image, downscale=8):
+def make_points(image, downscale=1):
     points = np.zeros((image.shape[0], image.shape[1], 3))
     for y in range(image.shape[0]):
         for x in range(image.shape[1]):
             z = image[image.shape[0] - y - 1, x]
-            points[y, x] = [x / downscale, y / downscale, z]
+            points[y, x] = [x * 10 / downscale, y * 10 / downscale, z * 100]
 
     return points
 
@@ -152,9 +152,9 @@ def rotz(pose, a):
 
 def camera_poses():
     base_pose = np.array([
-        [1.0, 0.0, 0.0, 60],
-        [0.0, 1.0, 0.0, 60.0],
-        [0.0, 0.0, 1.0, 300],
+        [1.0, 0, 0, 600.0 * 8],
+        [.0, 1.0, 0.0, 600.0 * 8],
+        [0.0, 0, 1, 0.1 * 500000],
         [0.0, 0.0, 0.0, 1.0],
     ])
 
@@ -174,19 +174,22 @@ def pkl_save(obj, filename):
         pickle.dump(obj, f)
 
 
-def generate_eo_dataset(scene, renderer):
+def generate_eo_dataset(scene, renderer, sun):
     image_index = 1
 
     for pose, posename in camera_poses():
-        scene.set_pose(camn, pose)
+        for (sunpose, ambient), time in [(sun.cycle(time), time) for time in np.arange(0, np.pi, 0.1)]:
+            scene.set_pose(camn, pose)
+            scene.set_pose(sun.node, sunpose)
+            scene.ambient_light = ambient
 
-        color, depth = renderer.render(scene)
+            color, depth = renderer.render(scene)
 
-        bgr = cv2.cvtColor(color, cv2.COLOR_RGB2BGR)
-        cv2.imwrite(f"/home/amarcos/workspace/TFG/scripts/generated_eo_data/{image_index:010d}.png", bgr)
-        pkl_save({'camera_pose': pose, 'sunpose': np.eye(4)}, f"/home/amarcos/workspace/TFG/scripts/generated_eo_data/{image_index:010d}.pkl")
+            bgr = cv2.cvtColor(color, cv2.COLOR_RGB2BGR)
+            cv2.imwrite(f"/home/amarcos/workspace/TFG/scripts/generated_eo_data/{image_index:010d}.png", bgr)
+            pkl_save({'camera_pose': pose, 'sun_pose': sunpose, 'time': time}, f"/home/amarcos/workspace/TFG/scripts/generated_eo_data/{image_index:010d}.pkl")
 
-        image_index += 1
+            image_index += 1
 
 
 def interact(scene):
@@ -215,19 +218,19 @@ if __name__ == '__main__':
 
     sun = Sun(sunlight)
 
-    camera = pyrender.PerspectiveCamera(yfov=1, aspectRatio=1.0)
+    camera = pyrender.PerspectiveCamera(yfov=np.pi / 3.0 / 8, aspectRatio=1.0)
     # camera = pyrender.OrthographicCamera(40, 40, zfar=1000)
     s = np.sqrt(2) / 2
     camera_pose = np.array([
-        [1.0, 0, 0, 60],
-        [.0, 1.0, 0.0, 60.0],
-        [0.0, 0, 1, 300],
+        [1.0, 0, 0, 600.0 * 8],
+        [.0, 1.0, 0.0, 600.0 * 8],
+        [0.0, 0, 1, 0.1 * 500000],
         [0.0, 0.0, 0.0, 1.0],
     ])
     camn = scene.add(camera, pose=camera_pose)
-    r = pyrender.OffscreenRenderer(80, 80)
 
     # interact(scene)
-    generate_eo_dataset(scene, r)
+    r = pyrender.OffscreenRenderer(1024, 1024)
+    generate_eo_dataset(scene, r, sun)
 
     print()
