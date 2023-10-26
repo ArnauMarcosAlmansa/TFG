@@ -67,10 +67,10 @@ if __name__ == '__main__':
     c = PinholeCamera(1024, 1024, 50, t.eye(4))
     model = Test().to(device)
     loss = t.nn.MSELoss()
-    optim = t.optim.Adam(params=model.parameters(), lr=0.001, betas=(0.9, 0.999))
+    optim = t.optim.Adam(params=model.parameters(), lr=0.01, betas=(0.9, 0.999))
     r = SimpleRenderer(c, model, 100)
 
-    trainer = StaticRenderTrainer(model, optim, loss, loader, 'STATIC_RENDERED_PIXELS_NOBACKGROUND', renderer=r)
+    trainer = StaticRenderTrainer(model, optim, loss, loader, 'STATIC_RENDERED_COMPOSITING_1', renderer=r)
     trainer = Checkpoint(trainer, "./checkpoints_staticrender/")
 
     trainer.train(0)
@@ -78,7 +78,7 @@ if __name__ == '__main__':
     torch.no_grad()
     model.eval()
 
-    _, _, _, d = next(iter(loader))
+    _, _, _, _, d = next(iter(loader))
 
     pose = d['camera_pose'].squeeze()
     c.pose = pose[0]
@@ -87,9 +87,9 @@ if __name__ == '__main__':
     for o in np.arange(-0.001, 0.001, 0.0002):
         print(o)
         c.pose = copy.deepcopy(pose[0])
-        c.pose[0, 3] += o
-        im = r.render_depth()
-        im = (im - im.min()) / (im.max() - im.min())
+        c.pose[0, 3] += 0
+        im = r.render()
+        # im = (im - im.min()) / (im.max() - im.min())
         im = (im.detach().cpu().numpy() * 255).astype(np.uint8)
         images.append(im)
         plt.imshow(images[-1])

@@ -30,8 +30,9 @@ class SimpleRenderer:
         step = (far - near) / self.n_samples
 
         rgb = t.zeros((rays_o.shape[0], 3)).to(device)
-        for sample_index in range(self.n_samples - 1, -1, -1):
-            points = rays_o + rays_d * step * sample_index
+        Ti = t.ones((rays_o.shape[0], 3)).to(device)
+        for sample_index in range(self.n_samples):
+            points = rays_o + rays_d * step * sample_index + near
 
             rgb_slice, density_slice = self.sampler(points)
             rgb_slice = t.sigmoid(rgb_slice)
@@ -39,7 +40,11 @@ class SimpleRenderer:
 
             alpha_slice = density2alpha(density_slice, step).unsqueeze(-1)
             alpha_slice = torch.broadcast_to(alpha_slice, rgb_slice.shape)
-            rgb = (1 - alpha_slice) * rgb + alpha_slice * rgb_slice
+
+            Ti = Ti * (1 - alpha_slice)
+            w = Ti * alpha_slice
+
+            rgb = rgb + w * rgb_slice
 
         return rgb
 

@@ -15,7 +15,7 @@ class StaticRenderTrainer(Trainer):
         running_loss = 0.0
         l = len(self.train_loader)
         for i, data in enumerate(self.train_loader):
-            colors, rays_o, rays_d, d = data
+            colors, rays_o, rays_d, sun_dir, d = data
 
             # Zero your gradients for every batch!
             self._optimizer.zero_grad()

@@ -1,5 +1,6 @@
 import numpy as np
 
+from src.config import device
 from src.volume_render.cameras.Camera import Camera
 import torch as t
 import torch.nn.functional as F
@@ -25,4 +26,4 @@ class PinholeCamera(Camera):
 
         origins = self.pose[:3, -1].expand(directions.shape)
 
-        return origins, directions
+        return origins.to(device), directions.to(device)
