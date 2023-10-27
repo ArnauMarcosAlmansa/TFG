@@ -27,6 +27,7 @@ class PinholeRenderer:
 
         return origins, ends
 
+
     def render_rays(self, origins, ends):
         depths = torch.linspace(self.near, self.far, self.n_samples)
         depths += torch.rand(depths.size()) * (self.far - self.near) / self.n_samples
@@ -39,12 +40,35 @@ class PinholeRenderer:
         sigma = torch.relu(raw[..., 3])
         rgb = torch.relu(raw[..., :3])
 
-        dists = torch.concat([depths[..., 1:] - depths[..., :-1], torch.broadcast_to(torch.tensor([1e10]), depths[..., :1].shape)], -1)
+        sigma = sigma.resize(self.W, self.H, self.n_samples, 1)
+        rgb = rgb.resize(self.W, self.H, self.n_samples, 3)
+
+        dists: torch.Tensor = torch.concat([depths[..., 1:] - depths[..., :-1], torch.broadcast_to(torch.tensor([1e10]), depths[..., :1].shape)], -1)
+        dists = dists.repeat(sigma.shape[0] // self.n_samples)
+        alpha = 1. - torch.exp(-sigma * dists)
+
+        return rgb, sigma
+
+
+    def render_rays_bad(self, origins, ends):
+        depths = torch.linspace(self.near, self.far, self.n_samples)
+        depths += torch.rand(depths.size()) * (self.far - self.near) / self.n_samples
+
+        points: torch.Tensor = origins[...,None,:] + ends[...,None,:] * depths[...,:,None]
+
+        flat_points = torch.reshape(points, (-1, 3))
+
+        raw = self.model(flat_points)
+        sigma = torch.relu(raw[..., 3])
+        rgb = torch.relu(raw[..., :3])
+
+        dists: torch.Tensor = torch.concat([depths[..., 1:] - depths[..., :-1], torch.broadcast_to(torch.tensor([1e10]), depths[..., :1].shape)], -1)
+        dists = dists.repeat(sigma.shape[0] // self.n_samples)
         alpha = 1. - torch.exp(-sigma * dists)
         weights = alpha * torch.cumprod(1. - alpha + 1e-10, -1)
 
-        rgb_map = torch.sum(weights[..., None] * rgb, -2)
-        depth_map = torch.sum(weights * depths, -1)
+        rgb_map = torch.sum(weights[..., None] * rgb, -1)
+        depth_map = torch.sum(weights * depths.repeat(sigma.shape[0] // self.n_samples), -1)
         acc_map = torch.sum(weights, -1)
 
         return rgb_map, depth_map, acc_map
@@ -52,7 +76,13 @@ class PinholeRenderer:
 
 if __name__ == '__main__':
 
+    def model(points):
+        out = torch.zeros((points.shape[0], 4))
+        for i in range(points.shape[0]):
+            d = torch.sqrt(torch.sum(torch.square(points[i, :])))
+            out[i, :] = torch.ones(4) if d <= 1 else torch.zeros(4)
 
+        return out
 
 
     r = PinholeRenderer(60, 60, 0.2, model, 1, 10)

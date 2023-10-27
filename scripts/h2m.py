@@ -179,17 +179,18 @@ def generate_eo_dataset(scene, renderer, sun):
 
     for pose, posename in camera_poses():
         for (sunpose, ambient), time in [(sun.cycle(time), time) for time in np.arange(0, np.pi, 0.1)]:
-            scene.set_pose(camn, pose)
-            scene.set_pose(sun.node, sunpose)
-            scene.ambient_light = ambient
+            if np.random.random() > 0.99:
+                scene.set_pose(camn, pose)
+                scene.set_pose(sun.node, sunpose)
+                scene.ambient_light = ambient
 
-            color, depth = renderer.render(scene)
+                color, depth = renderer.render(scene)
 
-            bgr = cv2.cvtColor(color, cv2.COLOR_RGB2BGR)
-            cv2.imwrite(f"/home/amarcos/workspace/TFG/scripts/generated_eo_data/{image_index:010d}.png", bgr)
-            pkl_save({'camera_pose': pose, 'sun_pose': sunpose, 'time': time}, f"/home/amarcos/workspace/TFG/scripts/generated_eo_data/{image_index:010d}.pkl")
+                bgr = cv2.cvtColor(color, cv2.COLOR_RGB2BGR)
+                cv2.imwrite(f"/home/amarcos/workspace/TFG/scripts/generated_eo_data/{image_index:010d}.png", bgr)
+                pkl_save({'camera_pose': pose, 'sun_pose': sunpose, 'time': time}, f"/home/amarcos/workspace/TFG/scripts/generated_eo_data/{image_index:010d}.pkl")
 
-            image_index += 1
+                image_index += 1
 
 
 def interact(scene):
@@ -230,7 +231,7 @@ if __name__ == '__main__':
     camn = scene.add(camera, pose=camera_pose)
 
     # interact(scene)
-    r = pyrender.OffscreenRenderer(1024, 1024)
+    r = pyrender.OffscreenRenderer(120, 120)
     generate_eo_dataset(scene, r, sun)
 
     print()

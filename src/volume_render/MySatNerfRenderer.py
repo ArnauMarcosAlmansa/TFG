@@ -30,25 +30,38 @@ class MySatNerfRenderer:
         step = (far - near) / self.n_samples
 
         rgb = t.zeros((rays_o.shape[0], 3)).to(device)
-        for sample_index in range(self.n_samples - 1, -1, -1):
-            points = rays_o + rays_d * step * sample_index
+        uncertainty = t.zeros((rays_o.shape[0], 1)).to(device)
+        Ti = t.ones((rays_o.shape[0], 3)).to(device)
+        for sample_index in range(self.n_samples):
+            points = rays_o + rays_d * step * sample_index + near
 
             density_slice, uncertainty_slice, albedo_slice, shading_slice, ambient_slice = self.sampler(points, sun_dirs)
-            rgb_slice = albedo_slice
-            density_slice = density_slice
+            rgb_slice = t.sigmoid(albedo_slice) * shading_slice + ambient_slice
+            density_slice = t.relu(density_slice)
+
+
 
             alpha_slice = density2alpha(density_slice, step).unsqueeze(-1)
             alpha_slice = torch.broadcast_to(alpha_slice, rgb_slice.shape)
-            rgb = (1 - alpha_slice) * rgb + (alpha_slice * rgb_slice * shading_slice + ambient_slice)
 
-        return rgb
+            Ti = Ti * (1 - alpha_slice)
+            w = Ti * alpha_slice
+            l = shading_slice + (1 - shading_slice) * ambient_slice
 
-    def render_matrix_rays(self, rays_o, rays_d, sun_dirs, near=0., far=1.):
+            # integrar
+            rgb = rgb + w * rgb_slice * l
+            uncertainty = uncertainty + w[..., 0] * uncertainty_slice
+
+        # TODO: revisar como calcular el uncertainty correctamente
+        return rgb, uncertainty / self.n_samples
+
+    def render_matrix_rays(self, rays_o, rays_d, near=0., far=1.):
         rgb = t.zeros((self.camera.h, self.camera.w, 3)).to(device)
+        uncertainty = t.zeros((self.camera.h, self.camera.w, 1)).to(device)
         for i in range(rgb.shape[0]):
-            rgb[i] = self.render_arbitrary_rays(rays_o[i], rays_d[i], sun_dirs, near, far).detach()
+            rgb[i], uncertainty[i] = self.render_arbitrary_rays(rays_o[i], rays_d[i], near, far)
 
-        return rgb
+        return rgb, uncertainty
 
     def render(self, near=0., far=1.):
         rays_o, rays_d = self.camera.get_rays()
@@ -66,7 +79,7 @@ class MySatNerfRenderer:
 
             distance = step * sample_index
 
-            density_slice, _, _, _, _ = self.sampler(points)
+            _rgb_slice, density_slice = self.sampler(points)
             density_slice = t.relu(density_slice)
 
             depth = depth + distance * density_slice.unsqueeze(-1)

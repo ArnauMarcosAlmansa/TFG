@@ -41,6 +41,8 @@ class SyntheticEODataset:
             x_forward = torch.tensor([1.0, 0.0, 0.0])
             sun_dir = torch.matmul(sunpose, x_forward)
 
+            data['j'] = num
+
             for i in range(im.shape[0]):
                 for j in range(im.shape[1]):
                     self.pixels.append((torch.from_numpy(im[i, j]).to(device), rays_o[i, j], rays_d[i, j], sun_dir, data))

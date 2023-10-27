@@ -9,6 +9,7 @@ import torch.utils.data
 from src.config import device, fix_cuda
 from src.dataloaders.SyntheticDataloader import SyntheticEODataset
 from src.models.MySatNerf import MySatNerf
+from src.models.losses.SatNerfLoss import SatNerfLoss
 from src.training.SatnerfRenderTrainer import SatnerfRenderTrainer
 from src.training.decorators.Checkpoint import Checkpoint
 from src.volume_render.MySatNerfRenderer import MySatNerfRenderer
@@ -20,25 +21,25 @@ if __name__ == '__main__':
 
     data = SyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_eo_data/")
 
-    loader = torch.utils.data.DataLoader(data, shuffle=True, batch_size=1024 * 8)
+    loader = torch.utils.data.DataLoader(data, shuffle=True, batch_size=1024 * 3)
 
     torch.no_grad()
 
-    c = PinholeCamera(1024, 1024, 50, t.eye(4))
+    c = PinholeCamera(120, 120, 50, t.eye(4))
     model = MySatNerf().to(device)
-    loss = t.nn.MSELoss()
+    loss = SatNerfLoss()
     optim = t.optim.Adam(params=model.parameters(), lr=0.001, betas=(0.9, 0.999))
     r = MySatNerfRenderer(c, model, 100)
 
     trainer = SatnerfRenderTrainer(model, optim, loss, loader, 'STATIC_RENDERED_PIXELS_NOBACKGROUND', renderer=r)
     trainer = Checkpoint(trainer, "./checkpoints_satnerfrender/")
 
-    trainer.train(1)
+    trainer.train(10000)
 
     torch.no_grad()
     model.eval()
 
-    _, _, _, d = next(iter(loader))
+    _, _, _, _, d = next(iter(loader))
 
     pose = d['camera_pose'].squeeze()
     c.pose = pose[0]

@@ -1,5 +1,6 @@
 import statistics
 
+import cv2
 import numpy as np
 import pandas
 import torch.nn
@@ -73,24 +74,24 @@ def train():
     train_loader = torch.utils.data.DataLoader(data,
                                                batch_size=1, shuffle=True,
                                                num_workers=0)
-    model = MyNerf(inputs=60, outputs=3)
+    model = MyNerf(inputs=30, outputs=3)
     # model = Siren(inputs=40)
     model = model.to(device)
     optim = torch.optim.Adam(params=model.parameters(), lr=0.001)
     loss = torch.nn.MSELoss()
     trainer = RenderLossTrainer(model=model, optimizer=optim, loss=loss, train_loader=train_loader, test_loader=None,
-                      checkpoint=CheckPoint("./checkpoints_memorize/"), validation=None, height=60, width=60)
+                      checkpoint=CheckPoint("./checkpoints_lower_freq/"), validation=None, height=60, width=60)
 
-    trainer.train(100)
+    trainer.train(10)
 
     return model
 
 
 def query(model, when):
     model.eval()
-    resolution = 100
+    resolution = 60
     im = np.zeros((resolution, resolution, 3))
-    se = PositionalEncode(10)
+    se = PositionalEncode(5)
     step = 2 / resolution
     for i, y in enumerate(np.arange(-1, 1, step)):
         for j, x in enumerate(np.arange(-1, 1, step)):
@@ -108,9 +109,14 @@ def load_checkpoint(model, path):
 if __name__ == '__main__':
     fix_cuda()
     model = train()
-    # model = Siren(inputs=40)
+    # model = MyNerf(inputs=60, outputs=3)
     # model = model.to(device)
-    # load_checkpoint(model, "./checkpoints_memorize/siren_checkpoint_epoch_99.ckpt")
-    im = query(model, 0.5)
-    plt.imshow(im)
-    plt.show()
+    # load_checkpoint(model, "./checkpoints_memorize/checkpoint_epoch_49.ckpt")
+    video = cv2.VideoWriter("video.mp4", cv2.VideoWriter_fourcc(*'mp4v'), 5, (60, 60))
+
+    for i, t in enumerate(np.arange(0, 1, 1 / 10)):
+        print(f"RENDERING {i}")
+        im = query(model, t)
+        video.write((im * 255).astype(np.uint8))
+        plt.imshow(im)
+        plt.show()

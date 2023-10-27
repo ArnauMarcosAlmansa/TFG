@@ -64,7 +64,7 @@ if __name__ == '__main__':
 
     torch.no_grad()
 
-    c = PinholeCamera(1024, 1024, 50, t.eye(4))
+    c = PinholeCamera(120, 120, 50, t.eye(4))
     model = Test().to(device)
     loss = t.nn.MSELoss()
     optim = t.optim.Adam(params=model.parameters(), lr=0.01, betas=(0.9, 0.999))
@@ -73,7 +73,7 @@ if __name__ == '__main__':
     trainer = StaticRenderTrainer(model, optim, loss, loader, 'STATIC_RENDERED_COMPOSITING_1', renderer=r)
     trainer = Checkpoint(trainer, "./checkpoints_staticrender/")
 
-    trainer.train(0)
+    trainer.train(100)
 
     torch.no_grad()
     model.eval()

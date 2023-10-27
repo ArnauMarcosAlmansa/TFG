@@ -43,15 +43,18 @@ class MySatNerf(torch.nn.Module):
 
         self.ambient = torch.nn.Sequential(
             Sin(),
-            torch.nn.Linear(20, width // 2),
+            torch.nn.Linear(60, width // 2),
             Sin(),
             torch.nn.Linear(width // 2, 3)
         )
 
         self.uncertainty = torch.nn.Sequential(
-            torch.nn.Embedding(100, 10),
+            # TODO: el embedding tiene que venir dado por cada imagen
+            # torch.nn.Embedding(100, 10),
             Sin(),
-            torch.nn.Linear(10, width // 2)
+            # TODO: conseguir poner a 10
+            torch.nn.Linear(60, 1),
+            torch.nn.Softplus()
         )
 
         self.albedo = torch.nn.Sequential(
@@ -62,7 +65,7 @@ class MySatNerf(torch.nn.Module):
 
         self.shading = torch.nn.Sequential(
             Sin(),
-            torch.nn.Linear(width, width // 2),
+            torch.nn.Linear(width + 60, width // 2),
             Sin(),
             torch.nn.Linear(width // 2, width // 2),
             Sin(),

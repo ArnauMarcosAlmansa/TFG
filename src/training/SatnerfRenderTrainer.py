@@ -22,11 +22,11 @@ class SatnerfRenderTrainer(Trainer):
 
             print(f"Rendering {i + 1}/{l}")
             self.renderer.camera.pose = d['camera_pose'].squeeze()
-            outputs = self.renderer.render_arbitrary_rays(rays_o, rays_d, sun_dirs)
+            outputs, uncertainty = self.renderer.render_arbitrary_rays(rays_o, rays_d, sun_dirs)
 
             print(f"Computing loss {i + 1}/{l}")
             # Compute the loss and its gradients
-            loss = self._loss(outputs, colors.squeeze().to(device))
+            loss = self._loss(outputs, uncertainty, colors.squeeze().to(device))
             loss.backward()
 
             # Adjust learning weights
