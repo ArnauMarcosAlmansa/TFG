@@ -65,8 +65,7 @@ def make_mlp4(w: int) -> torch.nn.Module:
 
 
 class EONeRF(torch.nn.Module):
-    # TODO: 17 hardcoded
-    def __init__(self, w=256, n_images=17):
+    def __init__(self, *, n_images, w=256):
         super().__init__()
         self.encode_x = PositionalEncode(10)
 
@@ -130,6 +129,7 @@ class Renderer:
 
         rgb = torch.zeros((rays_o.shape[0], 3)).to(device)
         unc = torch.zeros(rays_o.shape[0]).to(device)
+        trans = torch.zeros(rays_o.shape[0]).to(device)
         Ti = torch.ones((rays_o.shape[0], 3)).to(device)
         for sample_index in range(self.n_samples):
             points = rays_o + rays_d * step * sample_index + near
@@ -147,8 +147,20 @@ class Renderer:
 
             rgb = rgb + w * rgb_slice
             unc = unc + w[..., 0].squeeze() * uncertainty
+            trans = trans + w[..., 0].squeeze() * transient
 
         a, b = self.model.get_ab(j)
+
+        # TODO: renderizar las sombras
+        # s(r) = sgeo(r)τ (r) = T (rsun(tN ))
+        # N∑
+        # i=1
+        # Tiαiτ (xi)
+
+        # INTENTO
+        # depth = self.render_depth_arbitrary_rays(rays_o, rays_d)
+        # potential_shadow_points = rays_o + rays_d * depth + near
+        # self.model(potential_shadow_points, sun_dirs, j)
 
         # color = a * (l * rgb) + b
         color = a * (rgb) + b
@@ -186,9 +198,9 @@ class Renderer:
             alpha_slice = density2alpha(density, step).unsqueeze(-1)
 
             Ti = Ti * (1 - alpha_slice)
-            # w = Ti * alpha_slice
+            w = Ti * alpha_slice
 
-            depth = depth + Ti * distance * alpha_slice
+            depth = depth + w * distance
 
         return depth
 
@@ -248,7 +260,6 @@ class EONeRFTrainer(Trainer):
         return running_loss / l
 
 
-
 if __name__ == '__main__':
     fix_cuda()
 
@@ -259,7 +270,7 @@ if __name__ == '__main__':
     torch.no_grad()
 
     c = PinholeCamera(120, 120, 50, torch.eye(4))
-    model = EONeRF().to(device)
+    model = EONeRF(n_images=17).to(device)
     loss = EONeRFLoss()
     optim = torch.optim.Adam(params=model.parameters(), lr=0.01, betas=(0.9, 0.999))
     r = Renderer(c, model)
@@ -268,5 +279,3 @@ if __name__ == '__main__':
     trainer = Checkpoint(trainer, "./checkpoints_staticrender/")
 
     trainer.train(100)
-
-
