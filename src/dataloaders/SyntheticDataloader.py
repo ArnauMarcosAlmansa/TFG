@@ -37,6 +37,9 @@ class SyntheticEODataset:
             camera = PinholeCamera(im.shape[1], im.shape[0], 50, torch.from_numpy(data['camera_pose']))
             rays_o, rays_d = camera.get_rays()
 
+            if "sun_pose" not in data:
+                data['sun_pose'] = np.eye(4)
+
             sunpose = torch.from_numpy(data['sun_pose'].astype(np.float32)).squeeze()[0:3, 0:3]
             x_forward = torch.tensor([1.0, 0.0, 0.0])
             sun_dir = torch.matmul(sunpose, x_forward)

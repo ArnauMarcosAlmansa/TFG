@@ -8,15 +8,18 @@ class Validation(TrainerDecorator):
         self._data_loader = data_loader
 
     def train_one_epoch(self, epoch):
-        self._trainer.train_one_epoch(epoch)
+        summary = self._trainer.train_one_epoch(epoch)
         if self.should_do_validation(epoch):
-            self.do_validation()
+            loss = self.do_validation()
+            summary = summary.with_validation_loss(loss)
+
+        return summary
 
     def should_do_validation(self, epoch) -> bool:
         return epoch % 10 == 9
 
     def do_validation(self):
-        self.validate(self.model(), self.loss(), self._data_loader)
+        return self.validate(self.model(), self.loss(), self._data_loader)
 
     def validate(self, model, loss_fn, data_loader):
         running_loss = 0.0
@@ -29,3 +32,5 @@ class Validation(TrainerDecorator):
 
         last_loss = running_loss / len(data_loader)
         print(f"VALIDATION, loss = {last_loss:.5f}")
+
+        return last_loss

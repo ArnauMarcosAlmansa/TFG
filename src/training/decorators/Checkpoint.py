@@ -3,6 +3,7 @@ import os
 import torch
 
 from src.training.AbstractTrainer import AbstractTrainer
+from src.training.EpochSummary import EpochSummary
 from src.training.decorators.TrainerDecorator import TrainerDecorator
 
 
@@ -17,18 +18,21 @@ class Checkpoint(TrainerDecorator):
             self.load_latest_checkpoint()
 
     def train(self, epochs):
-        epoch = 1
+        for epoch in range(self.epoch, epochs):
+            self.train_one_epoch(epoch)
+
+    def train_one_epoch(self, epoch):
         try:
-            for epoch in range(self.epoch, epochs):
-                self.train_one_epoch(epoch)
+            self.epoch = epoch
+            summary = self._trainer.train_one_epoch(epoch)
+            if self.should_do_checkpoint(epoch):
+                self.checkpoint(epoch, self.model(), self.optimizer(), self.loss())
+
+            return summary
         except KeyboardInterrupt as e:
             self.checkpoint(epoch - 1, self.model(), self.optimizer(), self.loss())
 
-    def train_one_epoch(self, epoch):
-        self.epoch = epoch
-        self._trainer.train_one_epoch(epoch)
-        if self.should_do_checkpoint(epoch):
-            self.checkpoint(epoch, self.model(), self.optimizer(), self.loss())
+        return EpochSummary(epoch)
 
     def should_do_checkpoint(self, epoch) -> bool:
         return epoch % 10 == 9
