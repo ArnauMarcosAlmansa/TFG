@@ -1,4 +1,5 @@
 import copy
+import os
 
 import imageio
 import matplotlib.pyplot as plt
@@ -58,7 +59,7 @@ class Test(t.nn.Module):
 if __name__ == '__main__':
     fix_cuda()
 
-    data = SyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_eo_data/")
+    data = SyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_eo_data (copy)/")
 
     loader = torch.utils.data.DataLoader(data, shuffle=True, batch_size=1024 * 8)
 
@@ -70,10 +71,10 @@ if __name__ == '__main__':
     optim = t.optim.Adam(params=model.parameters(), lr=0.01, betas=(0.9, 0.999))
     r = SimpleRenderer(c, model, 100)
 
-    trainer = StaticRenderTrainer(model, optim, loss, loader, 'STATIC_RENDERED_COMPOSITING_1', renderer=r)
+    trainer = StaticRenderTrainer(model, optim, loss, loader, 'STATIC_RENDERED_PIXELS', renderer=r)
     trainer = Checkpoint(trainer, "./checkpoints_staticrender/")
 
-    trainer.train(100)
+    trainer.train(0)
 
     torch.no_grad()
     model.eval()
@@ -87,7 +88,7 @@ if __name__ == '__main__':
     for o in np.arange(-0.001, 0.001, 0.0002):
         print(o)
         c.pose = copy.deepcopy(pose[0])
-        c.pose[0, 3] += 0
+        c.pose[0, 3] += o
         im = r.render()
         # im = (im - im.min()) / (im.max() - im.min())
         im = (im.detach().cpu().numpy() * 255).astype(np.uint8)
@@ -95,4 +96,10 @@ if __name__ == '__main__':
         plt.imshow(images[-1])
         plt.show()
 
-    imageio.mimsave('video_render_test.gif', images, duration=100)
+    os.environ['IMAGEIO_FFMPEG_EXE'] = '/usr/bin/ffmpeg'
+
+    writer = imageio.get_writer('test.mp4', fps=10)
+
+    for im in images:
+        writer.append_data(im)
+    writer.close()
