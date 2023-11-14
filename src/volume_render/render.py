@@ -59,7 +59,7 @@ class Test(t.nn.Module):
 if __name__ == '__main__':
     fix_cuda()
 
-    data = SyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_eo_data (copy)/")
+    data = SyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_eo_test_data/")
 
     loader = torch.utils.data.DataLoader(data, shuffle=True, batch_size=1024 * 8)
 
@@ -71,10 +71,10 @@ if __name__ == '__main__':
     optim = t.optim.Adam(params=model.parameters(), lr=0.01, betas=(0.9, 0.999))
     r = SimpleRenderer(c, model, 100)
 
-    trainer = StaticRenderTrainer(model, optim, loss, loader, 'STATIC_RENDERED_PIXELS', renderer=r)
+    trainer = StaticRenderTrainer(model, optim, loss, loader, 'STATIC_RENDERED_TEST', renderer=r)
     trainer = Checkpoint(trainer, "./checkpoints_staticrender/")
 
-    trainer.train(0)
+    trainer.train(1000)
 
     torch.no_grad()
     model.eval()
@@ -85,7 +85,7 @@ if __name__ == '__main__':
     c.pose = pose[0]
     images = []
 
-    for o in np.arange(-0.001, 0.001, 0.0002):
+    for o in np.arange(-600, 600, 10):
         print(o)
         c.pose = copy.deepcopy(pose[0])
         c.pose[0, 3] += o

@@ -1,6 +1,7 @@
 import time
 
 import cv2
+import glm
 import numpy as np
 import rasterio
 import trimesh
@@ -27,6 +28,9 @@ class Sun:
 
 def load_dem(filename, upscale=8, blur=17):
     dem = np.squeeze(rasterio.open(filename).read()).astype(np.float32)
+
+    plt.imsave("dem.png", (dem - dem.min()) / (dem.max() - dem.min()), cmap='gray')
+
     dem2 = cv2.resize(dem, (dem.shape[1] * upscale, dem.shape[0] * upscale))
     dem2 = cv2.GaussianBlur(dem2, (blur, blur), 0)
     # dem = cv2.resize(dem2, (dem.shape[1], dem.shape[0]))
@@ -151,18 +155,53 @@ def rotz(pose, a):
 
 
 def camera_poses():
-    base_pose = np.array([
-        [1.0, 0, 0, 600.0 * 8],
-        [.0, 1.0, 0.0, 600.0 * 8],
-        [0.0, 0, 1, 0.1 * 500000],
-        [0.0, 0.0, 0.0, 1.0],
-    ])
+    pos = np.array([600.0 * 8, 600.0 * 8, 500000])
 
-    for x in np.arange(-0.1, 0.1, 0.05):
-        for y in np.arange(-0.1, 0.1, 0.05):
-            for z in np.arange(-0.1, 0.1, 0.05):
-                yield rotx(roty(rotz(base_pose, z), y), x), f"{x:.4f}_{y:.4f}_{z:.4f}"
+    for x in np.arange(-1000 * 2, 1000 * 2, 300):
+        for y in np.arange(-1000 * 2, 1000 * 2, 300):
+            eye = glm.vec3(pos[0], pos[1], pos[2])
+            center = glm.vec3(0, 0, 0)
 
+            cameraDirection = eye - center
+
+            up = glm.vec3(0.0, 1.0, 0.0)
+            cameraRight = glm.normalize(glm.cross(up, cameraDirection))
+            cameraUp = glm.cross(cameraDirection, cameraRight)
+
+            camera_pose = glm.lookAt(eye, center, cameraUp)
+            camera_pose[3, 2] = 50000
+            camera_pose[3, 1] += y + 600.0 * 8
+            camera_pose[3, 0] += x + 600.0 * 8
+
+            camera_pose = np.array(camera_pose).reshape((4, 4))
+
+            yield np.array(camera_pose), f"{x:.4f}_{y:.4f}"
+
+
+def ncamera_poses(n):
+
+    for _ in range(n):
+        x = np.random.uniform(600.0 * 3, 600.0 * 6, 1)[0]
+        y = np.random.uniform(600.0 * 3, 600.0 * 6, 1)[0]
+
+        pos = np.array([600.0 * 8 + x, 600.0 * 8 + y, 65000])
+        eye = glm.vec3(pos[0], pos[1], pos[2])
+        center = glm.vec3(600.0 * 8, 600.0 * 8, 0)
+
+        cameraDirection = eye - center
+
+        up = glm.vec3(0.0, 1.0, 0.0)
+        cameraRight = glm.normalize(glm.cross(up, cameraDirection))
+        cameraUp = glm.cross(cameraDirection, cameraRight)
+
+        camera_pose = glm.lookAt(eye, center, cameraUp)
+        camera_pose[3, 2] = 65000
+        camera_pose[3, 1] += y + 600.0 * 8
+        camera_pose[3, 0] += x + 600.0 * 8
+
+        camera_pose = np.array(camera_pose).reshape((4, 4))
+
+        yield np.array(camera_pose), f"{x:.4f}_{y:.4f}"
 
 def day():
     for t in np.arange(0, np.pi, 0.1):
@@ -177,20 +216,20 @@ def pkl_save(obj, filename):
 def generate_eo_dataset(scene, renderer, sun):
     image_index = 1
 
-    for pose, posename in camera_poses():
-        for (sunpose, ambient), time in [(sun.cycle(time), time) for time in np.arange(0, np.pi, 0.1)]:
-            if np.random.random() > 0.99:
-                scene.set_pose(camn, pose)
-                scene.set_pose(sun.node, sunpose)
-                scene.ambient_light = ambient
+    for pose, posename in ncamera_poses(20):
+        # for (sunpose, ambient), time in [(sun.cycle(time), time) for time in np.arange(0, np.pi, 0.1)]:
+        scene.set_pose(camn, pose)
+        # scene.set_pose(sun.node, sunpose)
+        # scene.ambient_light = ambient
 
-                color, depth = renderer.render(scene)
+        color, depth = renderer.render(scene)
 
-                bgr = cv2.cvtColor(color, cv2.COLOR_RGB2BGR)
-                cv2.imwrite(f"/home/amarcos/workspace/TFG/scripts/generated_eo_data/{image_index:010d}.png", bgr)
-                pkl_save({'camera_pose': pose, 'sun_pose': sunpose, 'time': time}, f"/home/amarcos/workspace/TFG/scripts/generated_eo_data/{image_index:010d}.pkl")
+        bgr = cv2.cvtColor(color, cv2.COLOR_RGB2BGR)
+        cv2.imwrite(f"/home/amarcos/workspace/TFG/scripts/generated_eo_test_data/{image_index:010d}.png", bgr)
+        # pkl_save({'camera_pose': pose, 'sun_pose': sunpose, 'time': time}, f"/home/amarcos/workspace/TFG/scripts/generated_eo_data/{image_index:010d}.pkl")
+        pkl_save({'camera_pose': pose}, f"/home/amarcos/workspace/TFG/scripts/generated_eo_test_data/{image_index:010d}.pkl")
 
-                image_index += 1
+        image_index += 1
 
 
 def interact(scene):
@@ -219,15 +258,30 @@ if __name__ == '__main__':
 
     sun = Sun(sunlight)
 
-    camera = pyrender.PerspectiveCamera(yfov=np.pi / 3.0 / 8, aspectRatio=1.0)
+    camera = pyrender.PerspectiveCamera(yfov=np.pi / 3 / 8, aspectRatio=1.0)
     # camera = pyrender.OrthographicCamera(40, 40, zfar=1000)
     s = np.sqrt(2) / 2
     camera_pose = np.array([
-        [1.0, 0, 0, 600.0 * 8],
-        [.0, 1.0, 0.0, 600.0 * 8],
-        [0.0, 0, 1, 0.1 * 500000],
+        [1.0, 0.0, 0.0, 600.0 * 8],
+        [0.0, 1.0, 0.0, 600.0 * 8],
+        [0.0, 0.0, 1.0, 0.1 * 500000],
         [0.0, 0.0, 0.0, 1.0],
     ])
+
+    eye = glm.vec3(camera_pose[0, 3], camera_pose[1, 3], camera_pose[2, 3])
+    center = glm.vec3(0, 0, 0)
+    up = glm.vec3(0, 0, 1)
+
+    cameraDirection = eye - center
+
+    up = glm.vec3(0.0, 1.0, 0.0)
+    cameraRight = glm.normalize(glm.cross(up, cameraDirection))
+    cameraUp = glm.cross(cameraDirection, cameraRight)
+
+    camera_pose = glm.lookAt(eye, center, cameraUp)
+    camera_pose[3, 2] = 600000
+    camera_pose = np.array(camera_pose).reshape((4, 4))
+
     camn = scene.add(camera, pose=camera_pose)
 
     # interact(scene)

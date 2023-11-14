@@ -74,7 +74,9 @@ class EONeRF(torch.nn.Module):
 
         self.t_emb = torch.nn.Embedding(n_images, 4)
         self.a_emb = torch.nn.Embedding(n_images, 3)
+        self.a_emb.weight.data.uniform_(-0.1, 0.1)
         self.b_emb = torch.nn.Embedding(n_images, 3)
+        self.b_emb.weight.data.uniform_(-0.1, 0.1)
 
         self.mlp1 = make_mlp1(w)
         self.mlp2 = make_mlp2(w)
@@ -121,7 +123,8 @@ class Renderer:
     def __init__(self, camera: Camera, model: EONeRF):
         self.camera = camera
         self.model = model
-        self.n_samples = 200
+        self.n_samples = 128
+        self.raw_rgb = False
 
     def render_arbitrary_rays(self, rays_o, rays_d, sun_dirs, j, near=0., far=1.):
         rays_d = rays_d / self.n_samples
@@ -132,13 +135,12 @@ class Renderer:
 
         rgb = torch.zeros((rays_o.shape[0], 3)).to(device)
         unc = torch.zeros(rays_o.shape[0]).to(device)
-        trans = torch.zeros(rays_o.shape[0]).to(device)
         Ti = torch.ones((rays_o.shape[0], 3)).to(device)
         for sample_index in range(self.n_samples):
             points = rays_o + rays_d * step * sample_index + near
 
             density, albedo, ambient, uncertainty, \
-                transient = self.model(points, sun_dirs, j)
+                _transient = self.model(points, sun_dirs, j)
             rgb_slice = torch.sigmoid(albedo)
             density_slice = torch.relu(density)
 
@@ -150,43 +152,39 @@ class Renderer:
 
             rgb = rgb + w * rgb_slice
             unc = unc + w[..., 0].squeeze() * uncertainty
-            trans = trans + w[..., 0].squeeze() * transient
 
         a, b = self.model.get_ab(j)
 
-        # TODO: renderizar las sombras
-        # s(r) = sgeo(r)τ (r) = T (rsun(tN ))
-        # N∑
-        # i=1
-        # Tiαiτ (xi)
+        if self.raw_rgb:
+            color = rgb
+        else:
+            sun_rays_d = -sun_dirs.to(device)
+            depth = self.render_depth_arbitrary_rays(rays_o, rays_d, sun_dirs, j)
+            potential_shadow_points = rays_o + rays_d * depth + near
+            strans = torch.zeros(rays_o.shape[0]).to(device)
+            for sample_index in range(self.n_samples):
+                points = potential_shadow_points + sun_rays_d * step * sample_index + near
 
-        # INTENTO
-        sun_rays_d = -sun_dirs
-        depth = self.render_depth_arbitrary_rays(rays_o, rays_d, sun_dirs, j)
-        potential_shadow_points = rays_o + rays_d * depth + near
-        strans = torch.zeros(rays_o.shape[0]).to(device)
-        for sample_index in range(self.n_samples):
-            points = rays_o + rays_d * step * sample_index + near
+                density, albedo, ambient, uncertainty, \
+                    transient = self.model(points, sun_dirs, j)
+                rgb_slice = torch.sigmoid(albedo)
+                density_slice = torch.relu(density)
 
-            density, albedo, ambient, uncertainty, \
-                transient = self.model(points, sun_dirs, j)
-            rgb_slice = torch.sigmoid(albedo)
-            density_slice = torch.relu(density)
+                alpha_slice = density2alpha(density_slice, step).unsqueeze(-1)
+                alpha_slice = torch.broadcast_to(alpha_slice, rgb_slice.shape)
 
-            alpha_slice = density2alpha(density_slice, step).unsqueeze(-1)
-            alpha_slice = torch.broadcast_to(alpha_slice, rgb_slice.shape)
+                Ti = Ti * (1 - alpha_slice)
+                w = Ti * alpha_slice
 
-            Ti = Ti * (1 - alpha_slice)
-            w = Ti * alpha_slice
+                strans = strans + w[..., 0].squeeze() * transient
 
-            strans = strans + w[..., 0].squeeze() * transient
+            s = Ti * torch.broadcast_to(strans.unsqueeze(-1), Ti.shape)
 
-        s = Ti * torch.broadcast_to(strans.unsqueeze(-1), Ti.shape)
+            def l(s, a):
+                return s + (1 - s) * a
 
-        def l(s, a):
-            return s + (1 - s) * a
-
-        color = a * (l(s, ambient) * rgb) + b
+            # color = a * (l(s, ambient) * rgb) + b
+            color = l(s, ambient) * rgb
 
         return color, unc
 
@@ -210,7 +208,7 @@ class Renderer:
     def render_depth_arbitrary_rays(self, rays_o, rays_d, sun_dirs, j, near=0., far=1.):
         rays_d = rays_d / self.n_samples
 
-        # que el step sea un poco aleatorio para evitar overfitting
+        # TODO: que el step sea un poco aleatorio para evitar overfitting
         step = (far - near) / self.n_samples
 
         depth = torch.zeros((rays_o.shape[0], 1)).to(device)
@@ -256,10 +254,12 @@ class EONeRFTrainer(Trainer):
     def __init__(self, model, optimizer, loss, train_loader, name, renderer):
         super().__init__(model, optimizer, loss, train_loader, name)
         self.renderer = renderer
+        self.mse_loss = torch.nn.MSELoss()
 
     def train_one_epoch(self, epoch):
+        self._model.train()
         running_loss = 0.
-        last_loss = 0.
+        last_loss = float('inf')
         l = len(self.train_loader)
         for i, data in enumerate(self.train_loader):
             # Every data instance is an input + label pair
@@ -269,10 +269,17 @@ class EONeRFTrainer(Trainer):
             self._optimizer.zero_grad()
 
             # Make predictions for this batch
-            color, uncertainty = self.renderer.render_arbitrary_rays(rays_o, rays_d, sun_dirs, d['j'].to(device))
 
             # Compute the loss and its gradients
-            loss = self._loss(color, uncertainty, colors)
+            if last_loss > 0.0005:
+                print("USING MSE loss")
+                color, uncertainty = self.renderer.render_arbitrary_rays(rays_o, rays_d, sun_dirs, d['j'].to(device))
+                loss = self.mse_loss(color, colors)
+            else:
+                print("USING MSE custom")
+                color, uncertainty = self.renderer.render_arbitrary_rays(rays_o, rays_d, sun_dirs, d['j'].to(device))
+                loss = self._loss(color, uncertainty, colors)
+
             loss.backward()
 
             # Adjust learning weights
@@ -283,6 +290,7 @@ class EONeRFTrainer(Trainer):
             print(f"Batch {i + 1}/{l} train_loss = {loss.item():.5f}")
 
         print(f"EPOCH {epoch}, train_loss = {running_loss / l:.5f}")
+        last_loss = running_loss / l
 
         return EpochSummary(epoch).with_training_loss(running_loss / l)
 
@@ -290,22 +298,22 @@ class EONeRFTrainer(Trainer):
 if __name__ == '__main__':
     fix_cuda()
 
-    data = SyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_eo_data (another copy)/")
-    loader = torch.utils.data.DataLoader(data, shuffle=True, batch_size=512)
+    data = SyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_eo_120res_data/")
+    loader = torch.utils.data.DataLoader(data, shuffle=True, batch_size=1024)
 
     torch.no_grad()
 
-    c = PinholeCamera(10, 10, 50, torch.eye(4))
-    model = EONeRF(n_images=17).to(device)
+    c = PinholeCamera(120, 120, 50, torch.eye(4))
+    model = EONeRF(n_images=39).to(device)
     loss = EONeRFLoss()
     optim = torch.optim.Adam(params=model.parameters(), lr=0.01, betas=(0.9, 0.999))
     r = Renderer(c, model)
 
-    trainer = EONeRFTrainer(model, optim, loss, loader, 'STATIC_RENDERED_COMPOSITING_CCCC', renderer=r)
-    trainer = Checkpoint(trainer, "./checkpoints_staticrender/")
+    trainer = EONeRFTrainer(model, optim, loss, loader, 'BULBASAUR', renderer=r)
+    trainer = Checkpoint(trainer, "./checkpoints_debug120res/")
     trainer = Tensorboard(trainer)
 
-    trainer.train(100000000)
+    trainer.train(0)
 
     colors, rays_o, rays_d, sun_dirs, d = next(iter(data))
 
