@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 
+from src.training.EpochSummary import EpochSummary
+
 
 class AbstractTrainer(ABC):
 
@@ -8,7 +10,7 @@ class AbstractTrainer(ABC):
         pass
 
     @abstractmethod
-    def train_one_epoch(self, epoch):
+    def train_one_epoch(self, epoch) -> EpochSummary:
         pass
 
     @abstractmethod

@@ -18,3 +18,6 @@ class Tensorboard(TrainerDecorator):
 
         if summary.validation_loss:
             self.summary.add_scalar("Validation/Loss", summary.validation_loss, summary.epoch)
+
+        for name, image in summary.tensorboard_images.items():
+            self.summary.add_image(name, image, summary.epoch)

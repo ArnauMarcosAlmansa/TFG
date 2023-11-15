@@ -25,6 +25,7 @@ class SyntheticEODataset:
     def __init__(self, path, transform=None):
         self.transform = transform
         self.pixels = []
+        self.n_images = 0
 
         png_filenames = sorted([filename for filename in os.listdir(path) if filename.endswith(".png")])
         for num, filename in enumerate(png_filenames):
@@ -50,6 +51,7 @@ class SyntheticEODataset:
                 for j in range(im.shape[1]):
                     self.pixels.append((torch.from_numpy(im[i, j]).to(device), rays_o[i, j], rays_d[i, j], sun_dir, data))
 
+            self.n_images += 1
             print(f"Loaded {num + 1}/{len(png_filenames)}")
 
     def __len__(self):
