@@ -75,7 +75,7 @@ class EONeRF(torch.nn.Module):
 
         self.t_emb = torch.nn.Embedding(n_images, 4)
         self.a_emb = torch.nn.Embedding(n_images, 3)
-        self.a_emb.weight.data.uniform_(-0.1, 0.1)
+        self.a_emb.weight.data.uniform_(0.9, 1.1)
         self.b_emb = torch.nn.Embedding(n_images, 3)
         self.b_emb.weight.data.uniform_(-0.1, 0.1)
 
@@ -106,8 +106,8 @@ class EONeRF(torch.nn.Module):
         return self.a_emb(j), self.b_emb(j)
 
 
-def density2alpha(raw, dists, act_fn=F.relu):
-    return 1. - torch.exp(-act_fn(raw) * dists)
+def density2alpha(density, dists):
+    return 1. - torch.exp(-density * dists)
 
 
 class Renderer:
@@ -280,7 +280,7 @@ if __name__ == '__main__':
     trainer = VisualValidation(trainer, r, d['camera_pose'], sun_dirs, d['j'])
     trainer = Tensorboard(trainer)
 
-    trainer.train(10)
+    trainer.train(10000)
 
     colors, rays_o, rays_d, sun_dirs, d = next(iter(data))
 
