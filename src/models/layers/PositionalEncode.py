@@ -6,6 +6,28 @@ from src.config import device
 import torch as t
 
 
+class Mapping(torch.nn.Module):
+    def __init__(self, mapping_size, in_size, logscale=True):
+        super().__init__()
+        self.N_freqs = mapping_size
+        self.in_channels = in_size
+        self.funcs = [torch.sin, torch.cos]
+        self.out_channels = self.in_channels*(len(self.funcs)*self.N_freqs+1)
+
+        if logscale:
+            self.freq_bands = 2**torch.linspace(0, self.N_freqs-1, self.N_freqs)
+        else:
+            self.freq_bands = torch.linspace(1, 2**(self.N_freqs-1), self.N_freqs)
+
+    def forward(self, x):
+        out = []
+        for freq in self.freq_bands:
+            for func in self.funcs:
+                out += [func(freq*x)]
+
+        return torch.cat(out, -1)
+
+
 class PositionalEncode(t.nn.Module):
     def __init__(self, L, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -16,6 +38,16 @@ class PositionalEncode(t.nn.Module):
 
     def do_positional_encoding(self, inputs):
         result = t.zeros(inputs.shape[0], inputs.shape[1] * self.L * 2, device=device)
+        for i in range(inputs.shape[1]):
+            for l in range(self.L):
+                result[:, i * self.L * 2 + l * 2] = t.sin(2 ** l * np.pi * inputs[:, i])
+                result[:, i * self.L * 2 + l * 2 + 1] = t.cos(2 ** l * np.pi * inputs[:, i])
+
+        return result
+
+    def do_positional_encoding3(self, inputs):
+        l = []
+
         for i in range(inputs.shape[1]):
             for l in range(self.L):
                 result[:, i * self.L * 2 + l * 2] = t.sin(2 ** l * np.pi * inputs[:, i])
