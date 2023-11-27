@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 from src.config import device, fix_cuda
 from src.dataloaders.SyntheticDataloader import SyntheticEODataset
-from src.models.layers.PositionalEncode import PositionalEncode
+from src.models.layers.PositionalEncode import PositionalEncode, Mapping
 from src.training.EpochSummary import EpochSummary
 from src.training.Trainer import Trainer
 from src.training.decorators.Checkpoint import Checkpoint
@@ -71,7 +71,7 @@ def make_mlp4(w: int) -> torch.nn.Module:
 class EONeRF(torch.nn.Module):
     def __init__(self, *, n_images, w=256):
         super().__init__()
-        self.encode_x = PositionalEncode(10)
+        self.encode_x = Mapping(10, 3, True)
 
         self.t_emb = torch.nn.Embedding(n_images, 4)
         self.a_emb = torch.nn.Embedding(n_images, 3)
