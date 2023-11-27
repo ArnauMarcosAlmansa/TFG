@@ -8,10 +8,13 @@ import torch as t
 import torch.utils.data
 
 from src.config import device, fix_cuda
+from src.dataloaders.NerfDataloader import NerfDataset
 from src.dataloaders.SyntheticDataloader import SyntheticEODataset
 from src.models.layers.PositionalEncode import PositionalEncode
 from src.training.StaticRenderTrainer import StaticRenderTrainer
 from src.training.decorators.Checkpoint import Checkpoint
+from src.training.decorators.Tensorboard import Tensorboard
+from src.training.decorators.Validation import Validation
 from src.volume_render.cameras.PinholeCamera import PinholeCamera
 from src.volume_render.SimpleRenderer import SimpleRenderer
 
@@ -59,33 +62,38 @@ class Test(t.nn.Module):
 if __name__ == '__main__':
     fix_cuda()
 
-    data = SyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_eo_test_data/")
+    # data = SyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_eo_test_data/")
+    train_data = NerfDataset("/DATA/nerf_synthetic/lego/transforms_train.json")
+    val_data = NerfDataset("/DATA/nerf_synthetic/lego/transforms_val.json")
+    # test_data = NerfDataset("/DATA/nerf_synthetic/lego/transforms_test.json")
 
-    loader = torch.utils.data.DataLoader(data, shuffle=True, batch_size=1024 * 8)
+    train_loader = torch.utils.data.DataLoader(train_data, shuffle=True, batch_size=1024)
+    val_loader = torch.utils.data.DataLoader(val_data, shuffle=True, batch_size=1024)
+#     test_loader = torch.utils.data.DataLoader(test_data, shuffle=True, batch_size=1024 * 8)
 
-    torch.no_grad()
-
-    c = PinholeCamera(120, 120, 50, t.eye(4))
+    c = PinholeCamera(800, 800, 50, t.eye(4))
     model = Test().to(device)
     loss = t.nn.MSELoss()
     optim = t.optim.Adam(params=model.parameters(), lr=0.01, betas=(0.9, 0.999))
     r = SimpleRenderer(c, model, 100)
 
-    trainer = StaticRenderTrainer(model, optim, loss, loader, 'STATIC_RENDERED_TEST', renderer=r)
-    trainer = Checkpoint(trainer, "./checkpoints_staticrender/")
+    trainer = StaticRenderTrainer(model, optim, loss, train_loader, 'NERF_LEGO_TEST', renderer=r)
+    trainer = Checkpoint(trainer, "./checkpoints_nerf/")
+    trainer = Validation(trainer, val_loader)
+    trainer = Tensorboard(trainer)
 
     trainer.train(1000)
 
     torch.no_grad()
     model.eval()
 
-    _, _, _, _, d = next(iter(loader))
+    _, _, _ = next(iter(val_loader))
 
     pose = d['camera_pose'].squeeze()
     c.pose = pose[0]
     images = []
 
-    for o in np.arange(-600, 600, 10):
+    for o in np.arange(0, 1, 1):
         print(o)
         c.pose = copy.deepcopy(pose[0])
         c.pose[0, 3] += o

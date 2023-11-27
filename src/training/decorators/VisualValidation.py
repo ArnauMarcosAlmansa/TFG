@@ -8,7 +8,7 @@ class VisualValidation(TrainerDecorator):
         self.j = j
         self.sun_dir = sun_dir
         self.renderer = renderer
-        self.camera = camera_pose
+        self.camera_pose = camera_pose
 
     def train_one_epoch(self, epoch):
         summary = self._trainer.train_one_epoch(epoch)
@@ -19,7 +19,7 @@ class VisualValidation(TrainerDecorator):
         return summary
 
     def should_do_validation(self, epoch) -> bool:
-        return epoch % 10 == 9
+        return True
 
     def do_validation(self):
         self.renderer.camera.pose = self.camera_pose
