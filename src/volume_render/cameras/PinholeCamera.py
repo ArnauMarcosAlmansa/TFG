@@ -7,9 +7,11 @@ import torch.nn.functional as F
 
 
 class PinholeCamera(Camera):
-    def __init__(self, w, h, f, pose):
+    def __init__(self, w, h, f, pose, near, far):
         super().__init__(w, h, pose)
         self.f = f
+        self.near = near
+        self.far = far
 
     def get_rays(self):
         xs = t.linspace(0, self.w - 1, self.w)

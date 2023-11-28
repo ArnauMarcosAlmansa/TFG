@@ -22,17 +22,17 @@ class SimpleRenderer:
         self.raw_noise_std = 0
         self.white_bkgd = True
 
-    def render_arbitrary_rays(self, rays_o, rays_d, near=0., far=1.):
+    def render_arbitrary_rays(self, rays_o, rays_d):
         rays_d = rays_d / self.n_samples
 
         sh = rays_d.shape  # [..., 3]
         # que el step sea un poco aleatorio para evitar overfitting
-        step = (far - near) / self.n_samples
+        step = (self.camera.far - self.camera.near) / self.n_samples
 
         rgb = t.zeros((rays_o.shape[0], 3)).to(device)
         Ti = t.ones((rays_o.shape[0], 3)).to(device)
         for sample_index in range(self.n_samples):
-            points = rays_o + rays_d * step * sample_index + near
+            points = rays_o + rays_d * step * sample_index + self.camera.near
 
             rgb_slice, density_slice = self.sampler(points)
             rgb_slice = t.sigmoid(rgb_slice)
@@ -48,16 +48,16 @@ class SimpleRenderer:
 
         return rgb
 
-    def render_matrix_rays(self, rays_o, rays_d, near=0., far=1.):
+    def render_matrix_rays(self, rays_o, rays_d):
         rgb = t.zeros((self.camera.h, self.camera.w, 3)).to(device)
         for i in range(rgb.shape[0]):
-            rgb[i] = self.render_arbitrary_rays(rays_o[i], rays_d[i], near, far).detach()
+            rgb[i] = self.render_arbitrary_rays(rays_o[i], rays_d[i]).detach()
 
         return rgb
 
-    def render(self, near=0., far=1.):
+    def render(self):
         rays_o, rays_d = self.camera.get_rays()
-        return self.render_matrix_rays(rays_o, rays_d, near, far)
+        return self.render_matrix_rays(rays_o, rays_d)
 
     def render_depth_arbitrary_rays(self, rays_o, rays_d, near=0., far=1.):
         rays_d = rays_d / self.n_samples

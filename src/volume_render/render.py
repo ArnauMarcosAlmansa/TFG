@@ -10,7 +10,7 @@ import torch.utils.data
 from src.config import device, fix_cuda
 from src.dataloaders.NerfDataloader import NerfDataset
 from src.dataloaders.SyntheticDataloader import SyntheticEODataset
-from src.models.layers.PositionalEncode import PositionalEncode
+from src.models.layers.PositionalEncode import PositionalEncode, Mapping
 from src.training.StaticRenderTrainer import StaticRenderTrainer
 from src.training.decorators.Checkpoint import Checkpoint
 from src.training.decorators.Tensorboard import Tensorboard
@@ -23,7 +23,7 @@ class Test(t.nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         width = 256
-        self.encode = PositionalEncode(10)
+        self.encode = Mapping(10, 3)
         self.block1 = t.nn.Sequential(
             t.nn.Linear(60, width),
             t.nn.ReLU(),
@@ -71,15 +71,15 @@ if __name__ == '__main__':
     val_loader = torch.utils.data.DataLoader(val_data, shuffle=True, batch_size=1024)
 #     test_loader = torch.utils.data.DataLoader(test_data, shuffle=True, batch_size=1024 * 8)
 
-    c = PinholeCamera(800, 800, 50, t.eye(4))
+    c = PinholeCamera(800, 800, train_data.focal, t.eye(4), 4, 6)
     model = Test().to(device)
     loss = t.nn.MSELoss()
     optim = t.optim.Adam(params=model.parameters(), lr=0.01, betas=(0.9, 0.999))
     r = SimpleRenderer(c, model, 100)
 
-    trainer = StaticRenderTrainer(model, optim, loss, train_loader, 'NERF_LEGO_TEST', renderer=r)
+    trainer = StaticRenderTrainer(model, optim, loss, train_loader, 'NERF_LEGO_TEST_4', renderer=r)
     trainer = Checkpoint(trainer, "./checkpoints_nerf/")
-    trainer = Validation(trainer, val_loader)
+    # trainer = Validation(trainer, val_loader)
     trainer = Tensorboard(trainer)
 
     trainer.train(1000)
@@ -89,13 +89,12 @@ if __name__ == '__main__':
 
     _, _, _ = next(iter(val_loader))
 
-    pose = d['camera_pose'].squeeze()
-    c.pose = pose[0]
+    c.pose = train_data.pose
     images = []
 
     for o in np.arange(0, 1, 1):
         print(o)
-        c.pose = copy.deepcopy(pose[0])
+        c.pose = copy.deepcopy(train_data.pose)
         c.pose[0, 3] += o
         im = r.render()
         # im = (im - im.min()) / (im.max() - im.min())
