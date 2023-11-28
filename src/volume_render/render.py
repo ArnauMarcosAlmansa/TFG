@@ -63,15 +63,15 @@ if __name__ == '__main__':
     fix_cuda()
 
     # data = SyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_eo_test_data/")
-    train_data = NerfDataset("/DATA/nerf_synthetic/lego/transforms_train.json")
-    val_data = NerfDataset("/DATA/nerf_synthetic/lego/transforms_val.json")
+    train_data = NerfDataset("/DATA/nerf_synthetic/lego/transforms_train.json", size=80)
+    val_data = NerfDataset("/DATA/nerf_synthetic/lego/transforms_val.json", size=80)
     # test_data = NerfDataset("/DATA/nerf_synthetic/lego/transforms_test.json")
 
     train_loader = torch.utils.data.DataLoader(train_data, shuffle=True, batch_size=1024)
     val_loader = torch.utils.data.DataLoader(val_data, shuffle=True, batch_size=1024)
 #     test_loader = torch.utils.data.DataLoader(test_data, shuffle=True, batch_size=1024 * 8)
 
-    c = PinholeCamera(800, 800, train_data.focal, t.eye(4), 4, 6)
+    c = PinholeCamera(80, 80, train_data.focal, train_data.pose, 4, 6)
     model = Test().to(device)
     loss = t.nn.MSELoss()
     optim = t.optim.Adam(params=model.parameters(), lr=0.01, betas=(0.9, 0.999))

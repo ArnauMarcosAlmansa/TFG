@@ -9,7 +9,7 @@ from src.volume_render.cameras.PinholeCamera import PinholeCamera
 
 
 class NerfDataset:
-    def __init__(self, json_path, transform=None):
+    def __init__(self, json_path, transform=None, size=800):
         self.images = []
         self.width = 0
         self.height = 0
@@ -26,6 +26,7 @@ class NerfDataset:
             for index, frame in enumerate(frames, 1):
                 im = cv2.imread(dirname + "/" + frame["file_path"] + ".png")
                 im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB).astype(np.float32) / 255
+                im = cv2.resize(im, (size, size))
 
                 self.width = im.shape[1]
                 self.height = im.shape[0]
@@ -43,6 +44,9 @@ class NerfDataset:
                 self.images.append((im, rays_o, rays_d))
 
                 print(f"LOADED {index} / {len(frames)}")
+
+                if index == 11:
+                    break
 
     def __len__(self):
         return len(self.images) * self.width * self.height
