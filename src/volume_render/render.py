@@ -58,31 +58,33 @@ class Test(t.nn.Module):
         y = self.block2(y)
         return y[:, :3], y[:, 3],
 
-
+# https://keras.io/examples/vision/nerf/
 if __name__ == '__main__':
     fix_cuda()
 
     # data = SyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_eo_test_data/")
-    train_data = NerfDataset("/DATA/nerf_synthetic/lego/transforms_train.json", size=80)
-    val_data = NerfDataset("/DATA/nerf_synthetic/lego/transforms_val.json", size=80)
+    train_data = NerfDataset("/home/arnau-marcos-almansa/Downloads/nerf_synthetic/lego/transforms_train.json", size=800)
+    val_data = NerfDataset("/home/arnau-marcos-almansa/Downloads/nerf_synthetic/lego/transforms_val.json", size=800)
     # test_data = NerfDataset("/DATA/nerf_synthetic/lego/transforms_test.json")
 
-    train_loader = torch.utils.data.DataLoader(train_data, shuffle=True, batch_size=1024)
-    val_loader = torch.utils.data.DataLoader(val_data, shuffle=True, batch_size=1024)
+    train_loader = torch.utils.data.DataLoader(train_data, shuffle=True, batch_size=1024, generator=torch.Generator(device='cuda'),)
+    val_loader = torch.utils.data.DataLoader(val_data, shuffle=True, batch_size=1024, generator=torch.Generator(device='cuda'),)
 #     test_loader = torch.utils.data.DataLoader(test_data, shuffle=True, batch_size=1024 * 8)
 
     c = PinholeCamera(80, 80, train_data.focal, train_data.pose, 4, 6)
     model = Test().to(device)
     loss = t.nn.MSELoss()
-    optim = t.optim.Adam(params=model.parameters(), lr=0.01, betas=(0.9, 0.999))
+    optim = t.optim.RAdam(params=model.parameters(), lr=0.0005, betas=(0.9, 0.999))
     r = SimpleRenderer(c, model, 100)
 
-    trainer = StaticRenderTrainer(model, optim, loss, train_loader, 'NERF_LEGO_TEST_4', renderer=r)
+    # r.render_arbitrary_rays(torch.tensor([[0, 0, 0]], device=device), torch.tensor([[1, 0, 0]], device=device))
+
+    trainer = StaticRenderTrainer(model, optim, loss, train_loader, 'NERF_LEGO_TEST_14', renderer=r)
     trainer = Checkpoint(trainer, "./checkpoints_nerf/")
     # trainer = Validation(trainer, val_loader)
     trainer = Tensorboard(trainer)
 
-    trainer.train(1000)
+    trainer.train(100)
 
     torch.no_grad()
     model.eval()
@@ -94,7 +96,7 @@ if __name__ == '__main__':
 
     for o in np.arange(0, 1, 1):
         print(o)
-        c.pose = copy.deepcopy(train_data.pose)
+        c.pose = copy.deepcopy(train_data.pose).to(device)
         c.pose[0, 3] += o
         im = r.render()
         # im = (im - im.min()) / (im.max() - im.min())
@@ -105,7 +107,7 @@ if __name__ == '__main__':
 
     os.environ['IMAGEIO_FFMPEG_EXE'] = '/usr/bin/ffmpeg'
 
-    writer = imageio.get_writer('test.mp4', fps=10)
+    writer = imageio.get_writer('NERF_LEGO_TEST_14.mp4', fps=10)
 
     for im in images:
         writer.append_data(im)

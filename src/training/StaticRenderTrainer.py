@@ -13,6 +13,10 @@ class StaticRenderTrainer(Trainer):
         self.renderer = renderer
 
     def train_one_epoch(self, epoch):
+
+        if epoch == 20:
+            self.train_loader.dataset.early = False
+
         running_loss = 0.0
         l = len(self.train_loader)
         for i, data in enumerate(self.train_loader):
