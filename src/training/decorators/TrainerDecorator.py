@@ -6,10 +6,6 @@ class TrainerDecorator(AbstractTrainer):
     def __init__(self, trainer: AbstractTrainer):
         self._trainer = trainer
 
-    def train(self, epochs):
-        for epoch in range(epochs):
-            self.train_one_epoch(epoch)
-
     def train_one_epoch(self, epoch):
         self._trainer.train_one_epoch(epoch)
 

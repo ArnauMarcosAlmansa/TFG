@@ -13,6 +13,7 @@ from src.volume_render.cameras.PinholeCamera import PinholeCamera
 class NerfDataset:
     def __init__(self, json_path, transform=None, size=800):
         self.images = []
+        self.poses = []
         self.width = 0
         self.height = 0
         self.transform = transform
@@ -41,6 +42,7 @@ class NerfDataset:
                     pose[i, :] = frame["transform_matrix"][i]
 
                 self.pose = torch.from_numpy(pose)
+                self.poses.append(self.pose)
 
                 camera = PinholeCamera(im.shape[1], im.shape[0], self.focal, torch.from_numpy(pose).to(device), 4, 6)
                 rays_o, rays_d = camera.get_rays()

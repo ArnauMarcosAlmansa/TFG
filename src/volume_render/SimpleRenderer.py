@@ -64,7 +64,8 @@ class SimpleRenderer:
         raw2alpha = lambda raw, dists, act_fn=F.relu: 1. - torch.exp(-act_fn(raw) * dists)
 
         dists = z_vals[..., 1:] - z_vals[..., :-1]
-        dists = torch.cat([dists, torch.Tensor([1e10]).to(device).expand(dists[..., :1].shape)], -1)  # [N_rays, N_samples]
+        dists = torch.cat([dists, torch.Tensor([1e10]).to(device).expand(dists[..., :1].shape)],
+                          -1)  # [N_rays, N_samples]
 
         dists = dists * torch.norm(rays_d[..., None, :], dim=-1)
 
@@ -96,6 +97,16 @@ class SimpleRenderer:
         t_vals = torch.linspace(0., 1., steps=self.n_samples, device=device)
         z_vals = self.camera.near * (1. - t_vals) + self.camera.far * (t_vals)
 
+        if self.perturb:
+            # get intervals between samples
+            mids = .5 * (z_vals[..., 1:] + z_vals[..., :-1])
+            upper = torch.cat([mids, z_vals[..., -1:]], -1)
+            lower = torch.cat([z_vals[..., :1], mids], -1)
+            # stratified samples in those intervals
+            t_rand = torch.rand(z_vals.shape)
+
+            z_vals = lower + (upper - lower) * t_rand
+
         pts = rays_o[..., None, :] + rays_d[..., None, :] * z_vals[..., :, None]
         shape = pts.shape
 
@@ -105,15 +116,23 @@ class SimpleRenderer:
 
         rgb_map, disp_map, acc_map, weights, depth_map = self.raw2outputs(rgb_slices, density_slices, z_vals, rays_d)
 
-        return rgb_map
-
+        return rgb_map, disp_map, acc_map, weights, depth_map
 
     def render_matrix_rays(self, rays_o, rays_d):
         rgb = t.zeros((self.camera.h, self.camera.w, 3)).to(device)
+        disp = t.zeros((self.camera.h, self.camera.w)).to(device)
+        acc = t.zeros((self.camera.h, self.camera.w)).to(device)
+        weights = t.zeros((self.camera.h, self.camera.w, self.n_samples)).to(device)
+        depth = t.zeros((self.camera.h, self.camera.w)).to(device)
         for i in range(rgb.shape[0]):
-            rgb[i] = self.render_arbitrary_rays(rays_o[i], rays_d[i]).detach()
+            rgb_map, disp_map, acc_map, weights_map, depth_map = self.render_arbitrary_rays(rays_o[i], rays_d[i])
+            rgb[i] = rgb_map.detach()
+            disp[i] = disp_map.detach()
+            acc[i] = acc_map.detach()
+            weights[i] = weights_map.detach()
+            depth[i] = depth_map.detach()
 
-        return rgb
+        return rgb, disp, acc, weights, depth
 
     def render(self):
         rays_o, rays_d = self.camera.get_rays()
