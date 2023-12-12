@@ -13,7 +13,7 @@ def density2alpha(raw, dists, act_fn=F.relu):
 
 
 class SimpleRenderer:
-    def __init__(self, camera: Camera, sampler, n_samples):
+    def __init__(self, camera: Camera, sampler, n_samples, n_channels=3):
         self.camera = camera
         self.sampler = sampler
         self.n_samples = n_samples
@@ -21,6 +21,7 @@ class SimpleRenderer:
         self.lindisp = True
         self.raw_noise_std = 0
         self.white_bkgd = True
+        self.n_channels = n_channels
 
     def render_arbitrary_rays_old(self, rays_o, rays_d):
         # cuanta distancia tiene que avanzar el rayo cada iteracion
@@ -119,7 +120,7 @@ class SimpleRenderer:
         pts = torch.cat([pts_flat, input_dirs_flat], -1)
 
         rgb_slices, density_slices = self.sampler(pts)
-        rgb_slices = torch.reshape(rgb_slices, (shape[0], shape[1], 3))
+        rgb_slices = torch.reshape(rgb_slices, (shape[0], shape[1], self.n_channels))
         density_slices = torch.reshape(density_slices, (shape[0], shape[1]))
 
         rgb_map, disp_map, acc_map, weights, depth_map = self.raw2outputs(rgb_slices, density_slices, z_vals, rays_d)
@@ -127,7 +128,7 @@ class SimpleRenderer:
         return rgb_map, disp_map, acc_map, weights, depth_map
 
     def render_matrix_rays(self, rays_o, rays_d):
-        rgb = t.zeros((self.camera.h, self.camera.w, 3)).to(device)
+        rgb = t.zeros((self.camera.h, self.camera.w, self.n_channels)).to(device)
         disp = t.zeros((self.camera.h, self.camera.w)).to(device)
         acc = t.zeros((self.camera.h, self.camera.w)).to(device)
         weights = t.zeros((self.camera.h, self.camera.w, self.n_samples)).to(device)
