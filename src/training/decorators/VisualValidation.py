@@ -29,7 +29,7 @@ class VisualValidation(TrainerDecorator):
         return summary
 
     def should_do_validation(self, epoch) -> bool:
-        return epoch % 10 == 0
+        return epoch % 20 == 0
 
     @torch.no_grad()
     def do_validation(self):

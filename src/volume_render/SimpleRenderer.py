@@ -107,10 +107,18 @@ class SimpleRenderer:
 
             z_vals = lower + (upper - lower) * t_rand
 
+
         pts = rays_o[..., None, :] + rays_d[..., None, :] * z_vals[..., :, None]
         shape = pts.shape
 
-        rgb_slices, density_slices = self.sampler(torch.reshape(pts, (shape[0] * shape[1], shape[2])))
+        pts_flat = torch.reshape(pts, (shape[0] * shape[1], shape[2]))
+
+        input_dirs = rays_d[:, None].expand(pts.shape)
+        input_dirs_flat = torch.reshape(input_dirs, [-1, input_dirs.shape[-1]])
+
+        pts = torch.cat([pts_flat, input_dirs_flat], -1)
+
+        rgb_slices, density_slices = self.sampler(pts)
         rgb_slices = torch.reshape(rgb_slices, (shape[0], shape[1], 3))
         density_slices = torch.reshape(density_slices, (shape[0], shape[1]))
 

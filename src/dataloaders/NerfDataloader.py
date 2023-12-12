@@ -44,7 +44,7 @@ class NerfDataset:
                 self.pose = torch.from_numpy(pose)
                 self.poses.append(self.pose)
 
-                camera = PinholeCamera(im.shape[1], im.shape[0], self.focal, torch.from_numpy(pose).to(device), 4, 6)
+                camera = PinholeCamera(im.shape[1], im.shape[0], self.focal, torch.from_numpy(pose).to(device), 2, 6)
                 rays_o, rays_d = camera.get_rays()
 
                 self.images.append((im, rays_o, rays_d))

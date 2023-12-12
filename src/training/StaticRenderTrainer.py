@@ -15,7 +15,7 @@ class StaticRenderTrainer(Trainer):
 
     def train_one_epoch(self, epoch):
 
-        if epoch == 20:
+        if epoch == 1:
             self.train_loader.dataset.early = False
 
         running_loss = 0.0
