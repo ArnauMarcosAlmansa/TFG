@@ -50,18 +50,6 @@ class SimpleRenderer:
         return rgb
 
     def raw2outputs(self, rgb_slices, density_slices, z_vals, rays_d, raw_noise_std=0, white_bkgd=False):
-        """Transforms model's predictions to semantically meaningful values.
-        Args:
-            raw: [num_rays, num_samples along ray, 4]. Prediction from model.
-            z_vals: [num_rays, num_samples along ray]. Integration time.
-            rays_d: [num_rays, 3]. Direction of each ray.
-        Returns:
-            rgb_map: [num_rays, 3]. Estimated RGB color of a ray.
-            disp_map: [num_rays]. Disparity map. Inverse of depth map.
-            acc_map: [num_rays]. Sum of weights along each ray.
-            weights: [num_rays, num_samples]. Weights assigned to each sampled color.
-            depth_map: [num_rays]. Estimated distance to object.
-        """
         raw2alpha = lambda raw, dists, act_fn=F.relu: 1. - torch.exp(-act_fn(raw) * dists)
 
         dists = z_vals[..., 1:] - z_vals[..., :-1]
