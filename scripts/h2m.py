@@ -1,3 +1,5 @@
+import json
+import os
 import time
 
 import cv2
@@ -10,7 +12,6 @@ from matplotlib import pyplot as plt
 import pickle
 
 
-
 class Sun:
     def __init__(self, node: pyrender.Node):
         self.node = node
@@ -21,7 +22,7 @@ class Sun:
         return np.clip(np.sin(np.ones(3) * when), 0, 1)
 
     def cycle(self, when):
-        return rotx(self.pose,  when - np.pi / 2), self.solar_color(when)
+        return rotx(self.pose, when - np.pi / 2), self.solar_color(when)
 
 
 # S2B_MSIL2A_20170709T094029_78_59
@@ -37,7 +38,6 @@ def load_dem(filename, upscale=8, blur=17):
     return dem2
 
 
-
 def load_albedo(base_directory, name):
     b = np.squeeze(rasterio.open(base_directory + name + "/" + name + "_B02.tif").read())
     g = np.squeeze(rasterio.open(base_directory + name + "/" + name + "_B03.tif").read())
@@ -45,6 +45,28 @@ def load_albedo(base_directory, name):
 
     rgb = np.stack([r, g, b], -1) // 5
     return rgb.astype(np.uint8)
+
+
+def load_bands(base_directory, name):
+    bands = [
+        np.squeeze(rasterio.open(base_directory + name + "/" + name + "_B01.tif").read()).astype(np.float32),
+        np.squeeze(rasterio.open(base_directory + name + "/" + name + "_B02.tif").read()).astype(np.float32),
+        np.squeeze(rasterio.open(base_directory + name + "/" + name + "_B03.tif").read()).astype(np.float32),
+        np.squeeze(rasterio.open(base_directory + name + "/" + name + "_B04.tif").read()).astype(np.float32),
+        np.squeeze(rasterio.open(base_directory + name + "/" + name + "_B05.tif").read()).astype(np.float32),
+        np.squeeze(rasterio.open(base_directory + name + "/" + name + "_B06.tif").read()).astype(np.float32),
+        np.squeeze(rasterio.open(base_directory + name + "/" + name + "_B07.tif").read()).astype(np.float32),
+        np.squeeze(rasterio.open(base_directory + name + "/" + name + "_B08.tif").read()).astype(np.float32),
+        np.squeeze(rasterio.open(base_directory + name + "/" + name + "_B09.tif").read()).astype(np.float32),
+        np.squeeze(rasterio.open(base_directory + name + "/" + name + "_B11.tif").read()).astype(np.float32),
+        np.squeeze(rasterio.open(base_directory + name + "/" + name + "_B12.tif").read()).astype(np.float32),
+        np.squeeze(rasterio.open(base_directory + name + "/" + name + "_B8A.tif").read()).astype(np.float32),
+    ]
+
+    for i in range(len(bands)):
+        bands[i] = (bands[i] / bands[i].max() * 255).astype(np.uint8)
+
+    return bands
 
 
 def load_image_gray(filename):
@@ -127,6 +149,23 @@ def make_terrain(dem_file, bands_folder, bands_name):
     return mesh
 
 
+def make_terrains(dem_file, bands_folder, bands_name):
+    hm = load_dem(dem_file)
+    # hm = np.array([[1, .75], [.75, 0]])
+    bands = load_bands(bands_folder, bands_name)
+    pts = make_points(hm)
+    vrtxs, uvs = make_triangles(pts)
+
+    meshes = []
+    for band in bands:
+        mtl = make_material(np.stack([band, band, band], -1))
+        prim = make_primitive(vrtxs, uvs, mtl)
+        mesh = make_mesh([prim])
+        meshes.append(mesh)
+
+    return meshes
+
+
 def rotx(pose, a):
     rot = np.eye(4)
     rot[1, 1] = np.cos(a)
@@ -179,7 +218,6 @@ def camera_poses():
 
 
 def ncamera_poses(n):
-
     for _ in range(n):
         x = np.random.uniform(600.0 * 3, 600.0 * 6, 1)[0]
         y = np.random.uniform(600.0 * 3, 600.0 * 6, 1)[0]
@@ -203,6 +241,7 @@ def ncamera_poses(n):
 
         yield np.array(camera_pose), f"{x:.4f}_{y:.4f}"
 
+
 def day():
     for t in np.arange(0, np.pi, 0.1):
         yield t, f"{t:.4f}"
@@ -224,12 +263,58 @@ def generate_eo_dataset(scene, renderer, sun):
 
         color, depth = renderer.render(scene)
 
-        bgr = cv2.cvtColor(color, cv2.COLOR_RGB2BGR)
-        cv2.imwrite(f"/home/amarcos/workspace/TFG/scripts/generated_eo_test_data/{image_index:010d}.png", bgr)
+        band = cv2.cvtColor(color, cv2.COLOR_RGB2GRAY)
+        cv2.imwrite(f"/home/amarcos/workspace/TFG/scripts/generated_eo_test_data/{image_index:010d}.png", band)
         # pkl_save({'camera_pose': pose, 'sun_pose': sunpose, 'time': time}, f"/home/amarcos/workspace/TFG/scripts/generated_eo_data/{image_index:010d}.pkl")
-        pkl_save({'camera_pose': pose}, f"/home/amarcos/workspace/TFG/scripts/generated_eo_test_data/{image_index:010d}.pkl")
+        pkl_save({'camera_pose': pose},
+                 f"/home/amarcos/workspace/TFG/scripts/generated_eo_test_data/{image_index:010d}.pkl")
 
         image_index += 1
+
+
+def generate_multispectral_eo_dataset(scene, renderer, sun, meshes):
+    folder = "/home/amarcos/workspace/TFG/scripts/generated_eo_multispectral_data/"
+    modes = ["train", "val", "test"]
+
+    for mode in modes:
+        image_index = 1
+
+        jsdoc = dict(frames=[], camera_angle_x=np.pi / 3 / 8)
+
+        os.makedirs(f"{folder}/{mode}", exist_ok=True)
+
+        for pose, posename in ncamera_poses(20):
+            # for (sunpose, ambient), time in [(sun.cycle(time), time) for time in np.arange(0, np.pi, 0.1)]:
+            scene.set_pose(camn, pose)
+
+
+
+            for mesh, bandname in zip(meshes, ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B08", "B09", "B11", "B12", "B8A", ]):
+                node = scene.add(mesh)
+
+                color, depth = renderer.render(scene)
+
+                bgr = cv2.cvtColor(color, cv2.COLOR_RGB2BGR)
+                cv2.imwrite(f"{folder}/{mode}/{image_index:010d}_{bandname}.png", bgr)
+
+                scene.remove_node(node)
+
+            jsdoc['frames'].append({
+                "transform_matrix": [
+                    [float(pose[0, 0]), float(pose[0, 1]), float(pose[0, 2]), float(pose[0, 3])],
+                    [float(pose[1, 0]), float(pose[1, 1]), float(pose[1, 2]), float(pose[1, 3])],
+                    [float(pose[2, 0]), float(pose[2, 1]), float(pose[2, 2]), float(pose[2, 3])],
+                    [float(pose[3, 0]), float(pose[3, 1]), float(pose[3, 2]), float(pose[3, 3])],
+                ],
+                "file_path": f"./{mode}/{image_index:010d}"
+            })
+            # scene.set_pose(sun.node, sunpose)
+            # scene.ambient_light = ambient
+
+            image_index += 1
+
+        json.dump(jsdoc, open(f"{folder}/transforms_{mode}.json", "wt"))
+
 
 
 def interact(scene):
@@ -237,9 +322,9 @@ def interact(scene):
 
 
 if __name__ == '__main__':
-    mesh = make_terrain(
-        "/home/amarcos/Downloads/BigEarthNet-S2-v1.0/BigEarthNet-S2-v1.0/dem/S2B_MSIL2A_20170709T094029_78_59_dem.tif",
-        "/home/amarcos/Downloads/BigEarthNet-S2-v1.0/BigEarthNet-S2-v1.0/BigEarthNet-v1.0/",
+    meshes = make_terrains(
+        "/data1tb/BigEarthNet-S2-v1.0/BigEarthNet-S2-v1.0/dem/S2B_MSIL2A_20170709T094029_78_59_dem.tif",
+        "/data1tb/BigEarthNet-S2-v1.0/BigEarthNet-S2-v1.0/BigEarthNet-v1.0/",
         "S2B_MSIL2A_20170709T094029_78_59"
     )
 
@@ -248,7 +333,7 @@ if __name__ == '__main__':
 
     scene = pyrender.Scene(ambient_light=np.array([1.0, 1.0, 1.0]))
     # scene = pyrender.Scene()
-    scene.add(mesh)
+    # scene.add(meshes[0])
     #     scene.add(cam)
     # sunlight = scene.add(light, pose=rotx(np.eye(4), np.pi / 2 - 0.3))
     sunlight = scene.add(light, pose=rotx(np.eye(4), 0))
@@ -284,8 +369,11 @@ if __name__ == '__main__':
 
     camn = scene.add(camera, pose=camera_pose)
 
-    # interact(scene)
-    r = pyrender.OffscreenRenderer(120, 120)
-    generate_eo_dataset(scene, r, sun)
+    r = pyrender.OffscreenRenderer(800, 800)
+    generate_multispectral_eo_dataset(scene, r, sun, meshes)
 
-    print()
+    # interact(scene)
+    # r = pyrender.OffscreenRenderer(120, 120)
+    # generate_eo_dataset(scene, r, sun)
+
+    print("END")
