@@ -63,7 +63,12 @@ def load_bands(base_directory, name):
         np.squeeze(rasterio.open(base_directory + name + "/" + name + "_B8A.tif").read()).astype(np.float32),
     ]
 
-    for i in range(len(bands)):
+    max_rgb = max(bands[1].max(), bands[2].max(), bands[3].max())
+    bands[1] = (bands[1] / max_rgb * 255).astype(np.uint8)
+    bands[2] = (bands[2] / max_rgb * 255).astype(np.uint8)
+    bands[3] = (bands[3] / max_rgb * 255).astype(np.uint8)
+
+    for i in [0, 4, 5, 6, 7, 8, 9, 10, 11]:
         bands[i] = (bands[i] / bands[i].max() * 255).astype(np.uint8)
 
     return bands
@@ -84,7 +89,7 @@ def make_points(image, scale=1, z_scale=2):
     for y in range(image.shape[0]):
         for x in range(image.shape[1]):
             z = image[image.shape[0] - y - 1, x]
-            points[y, x] = [(x - w/2) / w * scale, (y - h/2) / h * scale, (z / max_z) * z_scale]
+            points[y, x] = [(x - w / 2) / w * scale, (y - h / 2) / h * scale, (z / max_z) * z_scale]
 
     return points
 
@@ -168,6 +173,23 @@ def make_terrains(dem_file, bands_folder, bands_name):
     return meshes
 
 
+def lookAt(center, target, up):
+    f = (target - center)
+    f = f / np.linalg.norm(f)
+    s = np.cross(f, up)
+    s = s / np.linalg.norm(s)
+    u = np.cross(s, f)
+    u = u / np.linalg.norm(u)
+
+    m = np.zeros((4, 4))
+    m[0, :-1] = s
+    m[1, :-1] = u
+    m[2, :-1] = -f
+    m[-1, -1] = 1.0
+
+    return m
+
+
 def rotx(pose, a):
     rot = np.eye(4)
     rot[1, 1] = np.cos(a)
@@ -215,15 +237,24 @@ def camera_poses():
 
 def ncamera_poses(n):
     for _ in range(n):
-        x = np.random.uniform(-0.15, 0.15, 1)[0]
-        y = np.random.uniform(-0.15, 0.15, 1)[0]
+        x = np.random.uniform(-0.5, 0.5, 1)[0]
+        y = np.random.uniform(-0.5, 0.5, 1)[0]
 
         camera_pose = np.array([
             [1.0, 0.0, 0.0, x],
             [0.0, 1.0, 0.0, y],
-            [0.0, 0.0, 1.0, 7.0],
+            [0.0, 0.0, 1.0, 6.0],
             [0.0, 0.0, 0.0, 1.0],
         ])
+
+        eye = np.array([camera_pose[0, 3], camera_pose[1, 3], camera_pose[2, 3]])
+        center = np.array([0, 0, 0])
+        up = np.array([0, 1, 0])
+
+        rotation = np.linalg.inv(lookAt(eye, center, up))
+
+        # camera_pose = rotation * camera_pose
+        camera_pose[:3, :3] = rotation[:3, :3]
 
         yield camera_pose, f"{x:.4f}_{y:.4f}"
 
@@ -273,9 +304,9 @@ def generate_multispectral_eo_dataset(scene, renderer, sun, meshes):
             # for (sunpose, ambient), time in [(sun.cycle(time), time) for time in np.arange(0, np.pi, 0.1)]:
             scene.set_pose(camn, pose)
 
-
-
-            for mesh, bandname in zip(meshes, ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B08", "B09", "B11", "B12", "B8A", ]):
+            for mesh, bandname in zip(meshes,
+                                      ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B08", "B09", "B11", "B12",
+                                       "B8A", ]):
                 node = scene.add(mesh)
 
                 color, depth = renderer.render(scene)
@@ -300,7 +331,6 @@ def generate_multispectral_eo_dataset(scene, renderer, sun, meshes):
             image_index += 1
 
         json.dump(jsdoc, open(f"{folder}/transforms_{mode}.json", "wt"), indent=4)
-
 
 
 def interact(scene):
@@ -335,29 +365,24 @@ if __name__ == '__main__':
     camera_pose = np.array([
         [1.0, 0.0, 0.0, 0.0],
         [0.0, 1.0, 0.0, 0.0],
-        [0.0, 0.0, 1.0, 7.0],
+        [0.0, 0.0, 1.0, 5.0],
         [0.0, 0.0, 0.0, 1.0],
     ])
 
-    # eye = glm.vec3(camera_pose[0, 3], camera_pose[1, 3], camera_pose[2, 3])
-    # center = glm.vec3(0, 0, 0)
-    # up = glm.vec3(0, 0, 1)
-    #
-    # cameraDirection = eye - center
-    #
-    # up = glm.vec3(0.0, 1.0, 0.0)
-    # cameraRight = glm.normalize(glm.cross(up, cameraDirection))
-    # cameraUp = glm.cross(cameraDirection, cameraRight)
-    #
-    # camera_pose = glm.lookAt(eye, center, cameraUp)
-    # camera_pose = np.array(camera_pose).reshape((4, 4))
+    eye = np.array([camera_pose[0, 3], camera_pose[1, 3], camera_pose[2, 3]])
+    center = np.array([-1, 0, 0])
+    up = np.array([0, 1, 0])
 
+    rotation = np.linalg.inv(lookAt(eye, center, up))
+
+    # camera_pose = rotation * camera_pose
+    camera_pose[:3, :3] = rotation[:3, :3]
     camn = scene.add(camera, pose=camera_pose)
 
-    # r = pyrender.OffscreenRenderer(800, 800)
-    # generate_multispectral_eo_dataset(scene, r, sun, meshes)
-    #
-    interact(scene)
+    r = pyrender.OffscreenRenderer(800, 800)
+    generate_multispectral_eo_dataset(scene, r, sun, meshes)
+
+    # interact(scene)
     # r = pyrender.OffscreenRenderer(120, 120)
     # generate_eo_dataset(scene, r, sun)
 
