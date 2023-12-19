@@ -77,12 +77,14 @@ def load_image(filename):
     return cv2.cvtColor(cv2.imread(filename), cv2.COLOR_BGR2RGB)
 
 
-def make_points(image, downscale=1):
+def make_points(image, scale=1, z_scale=2):
     points = np.zeros((image.shape[0], image.shape[1], 3))
+    w, h = image.shape[1], image.shape[0]
+    max_z = image.max()
     for y in range(image.shape[0]):
         for x in range(image.shape[1]):
             z = image[image.shape[0] - y - 1, x]
-            points[y, x] = [x * 10 / downscale, y * 10 / downscale, z * 100]
+            points[y, x] = [(x - w/2) / w * scale, (y - h/2) / h * scale, (z / max_z) * z_scale]
 
     return points
 
@@ -194,52 +196,36 @@ def rotz(pose, a):
 
 
 def camera_poses():
-    pos = np.array([600.0 * 8, 600.0 * 8, 500000])
+    camera_pose = np.array([
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 7.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ])
 
-    for x in np.arange(-1000 * 2, 1000 * 2, 300):
+    for x in np.arange(-1, 1, 300):
         for y in np.arange(-1000 * 2, 1000 * 2, 300):
-            eye = glm.vec3(pos[0], pos[1], pos[2])
-            center = glm.vec3(0, 0, 0)
+            current_pose = np.copy(camera_pose)
 
-            cameraDirection = eye - center
+            current_pose[0, 3] += x
+            current_pose[1, 3] += y
 
-            up = glm.vec3(0.0, 1.0, 0.0)
-            cameraRight = glm.normalize(glm.cross(up, cameraDirection))
-            cameraUp = glm.cross(cameraDirection, cameraRight)
-
-            camera_pose = glm.lookAt(eye, center, cameraUp)
-            camera_pose[3, 2] = 50000
-            camera_pose[3, 1] += y + 600.0 * 8
-            camera_pose[3, 0] += x + 600.0 * 8
-
-            camera_pose = np.array(camera_pose).reshape((4, 4))
-
-            yield np.array(camera_pose), f"{x:.4f}_{y:.4f}"
+            yield current_pose, f"{x:.4f}_{y:.4f}"
 
 
 def ncamera_poses(n):
     for _ in range(n):
-        x = np.random.uniform(600.0 * 3, 600.0 * 6, 1)[0]
-        y = np.random.uniform(600.0 * 3, 600.0 * 6, 1)[0]
+        x = np.random.uniform(-0.15, 0.15, 1)[0]
+        y = np.random.uniform(-0.15, 0.15, 1)[0]
 
-        pos = np.array([600.0 * 8 + x, 600.0 * 8 + y, 65000])
-        eye = glm.vec3(pos[0], pos[1], pos[2])
-        center = glm.vec3(600.0 * 8, 600.0 * 8, 0)
+        camera_pose = np.array([
+            [1.0, 0.0, 0.0, x],
+            [0.0, 1.0, 0.0, y],
+            [0.0, 0.0, 1.0, 7.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ])
 
-        cameraDirection = eye - center
-
-        up = glm.vec3(0.0, 1.0, 0.0)
-        cameraRight = glm.normalize(glm.cross(up, cameraDirection))
-        cameraUp = glm.cross(cameraDirection, cameraRight)
-
-        camera_pose = glm.lookAt(eye, center, cameraUp)
-        camera_pose[3, 2] = 65000
-        camera_pose[3, 1] += y + 600.0 * 8
-        camera_pose[3, 0] += x + 600.0 * 8
-
-        camera_pose = np.array(camera_pose).reshape((4, 4))
-
-        yield np.array(camera_pose), f"{x:.4f}_{y:.4f}"
+        yield camera_pose, f"{x:.4f}_{y:.4f}"
 
 
 def day():
@@ -273,7 +259,7 @@ def generate_eo_dataset(scene, renderer, sun):
 
 
 def generate_multispectral_eo_dataset(scene, renderer, sun, meshes):
-    folder = "/home/amarcos/workspace/TFG/scripts/generated_eo_multispectral_data/"
+    folder = "/home/amarcos/workspace/TFG/scripts/generated_neo_multispectral_data/"
     modes = ["train", "val", "test"]
 
     for mode in modes:
@@ -313,7 +299,7 @@ def generate_multispectral_eo_dataset(scene, renderer, sun, meshes):
 
             image_index += 1
 
-        json.dump(jsdoc, open(f"{folder}/transforms_{mode}.json", "wt"))
+        json.dump(jsdoc, open(f"{folder}/transforms_{mode}.json", "wt"), indent=4)
 
 
 
@@ -333,7 +319,7 @@ if __name__ == '__main__':
 
     scene = pyrender.Scene(ambient_light=np.array([1.0, 1.0, 1.0]))
     # scene = pyrender.Scene()
-    # scene.add(meshes[0])
+    scene.add(meshes[1])
     #     scene.add(cam)
     # sunlight = scene.add(light, pose=rotx(np.eye(4), np.pi / 2 - 0.3))
     sunlight = scene.add(light, pose=rotx(np.eye(4), 0))
@@ -347,32 +333,31 @@ if __name__ == '__main__':
     # camera = pyrender.OrthographicCamera(40, 40, zfar=1000)
     s = np.sqrt(2) / 2
     camera_pose = np.array([
-        [1.0, 0.0, 0.0, 600.0 * 8],
-        [0.0, 1.0, 0.0, 600.0 * 8],
-        [0.0, 0.0, 1.0, 0.1 * 500000],
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 7.0],
         [0.0, 0.0, 0.0, 1.0],
     ])
 
-    eye = glm.vec3(camera_pose[0, 3], camera_pose[1, 3], camera_pose[2, 3])
-    center = glm.vec3(0, 0, 0)
-    up = glm.vec3(0, 0, 1)
-
-    cameraDirection = eye - center
-
-    up = glm.vec3(0.0, 1.0, 0.0)
-    cameraRight = glm.normalize(glm.cross(up, cameraDirection))
-    cameraUp = glm.cross(cameraDirection, cameraRight)
-
-    camera_pose = glm.lookAt(eye, center, cameraUp)
-    camera_pose[3, 2] = 600000
-    camera_pose = np.array(camera_pose).reshape((4, 4))
+    # eye = glm.vec3(camera_pose[0, 3], camera_pose[1, 3], camera_pose[2, 3])
+    # center = glm.vec3(0, 0, 0)
+    # up = glm.vec3(0, 0, 1)
+    #
+    # cameraDirection = eye - center
+    #
+    # up = glm.vec3(0.0, 1.0, 0.0)
+    # cameraRight = glm.normalize(glm.cross(up, cameraDirection))
+    # cameraUp = glm.cross(cameraDirection, cameraRight)
+    #
+    # camera_pose = glm.lookAt(eye, center, cameraUp)
+    # camera_pose = np.array(camera_pose).reshape((4, 4))
 
     camn = scene.add(camera, pose=camera_pose)
 
-    r = pyrender.OffscreenRenderer(800, 800)
-    generate_multispectral_eo_dataset(scene, r, sun, meshes)
-
-    # interact(scene)
+    # r = pyrender.OffscreenRenderer(800, 800)
+    # generate_multispectral_eo_dataset(scene, r, sun, meshes)
+    #
+    interact(scene)
     # r = pyrender.OffscreenRenderer(120, 120)
     # generate_eo_dataset(scene, r, sun)
 
