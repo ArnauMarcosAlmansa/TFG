@@ -134,33 +134,3 @@ class SimpleRenderer:
     def render(self):
         rays_o, rays_d = self.camera.get_rays()
         return self.render_matrix_rays(rays_o, rays_d)
-
-    def render_depth_arbitrary_rays(self, rays_o, rays_d, near=0., far=1.):
-        rays_d = rays_d / self.n_samples
-
-        # que el step sea un poco aleatorio para evitar overfitting
-        step = (far - near) / self.n_samples
-
-        depth = t.zeros((rays_o.shape[0], 1)).to(device)
-        for sample_index in range(self.n_samples - 1, -1, -1):
-            points = rays_o + rays_d * step * sample_index
-
-            distance = step * sample_index
-
-            _rgb_slice, density_slice = self.sampler(points)
-            density_slice = t.relu(density_slice)
-
-            depth = depth + distance * density_slice.unsqueeze(-1)
-
-        return depth
-
-    def render_depth_matrix_rays(self, rays_o, rays_d, near=0., far=1.):
-        rgb = t.zeros((self.camera.h, self.camera.w, 1)).to(device)
-        for i in range(rgb.shape[0]):
-            rgb[i] = self.render_depth_arbitrary_rays(rays_o[i], rays_d[i], near, far).detach()
-
-        return rgb
-
-    def render_depth(self, near=0., far=1.):
-        rays_o, rays_d = self.camera.get_rays()
-        return self.render_depth_matrix_rays(rays_o, rays_d, near, far)

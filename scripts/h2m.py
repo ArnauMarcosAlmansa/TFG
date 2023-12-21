@@ -349,7 +349,7 @@ if __name__ == '__main__':
 
     scene = pyrender.Scene(ambient_light=np.array([1.0, 1.0, 1.0]))
     # scene = pyrender.Scene()
-    scene.add(meshes[1])
+    # scene.add(meshes[1])
     #     scene.add(cam)
     # sunlight = scene.add(light, pose=rotx(np.eye(4), np.pi / 2 - 0.3))
     sunlight = scene.add(light, pose=rotx(np.eye(4), 0))
