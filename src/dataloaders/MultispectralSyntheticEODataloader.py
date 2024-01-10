@@ -14,6 +14,7 @@ BAND_NAMES = ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B08", "B09", "B1
 class MultispectralSyntheticEODataset:
     def __init__(self, json_path, transform=None, size=800):
         self.images = []
+        self.depths = []
         self.poses = []
         self.width = 0
         self.height = 0
@@ -37,6 +38,9 @@ class MultispectralSyntheticEODataset:
                     im = im.astype(np.float32)
                     im = cv2.resize(im, (size, size))
                     bands.append(im)
+
+                depth = np.load(dirname + "/" + frame["file_path"] + f"_DEPTH.npy")
+                self.depths.append(depth)
 
                 im = np.stack(bands, -1)
 

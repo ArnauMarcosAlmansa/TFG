@@ -95,6 +95,7 @@ if __name__ == '__main__':
     # data = SyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_eo_test_data/")
     train_data = MultispectralSyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_neo_multispectral_data/transforms_train.json", bands, size=800)
     val_data = MultispectralSyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_neo_multispectral_data/transforms_val.json", bands, size=800)
+    test_data = MultispectralSyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_neo_multispectral_data/transforms_test.json", bands, size=800)
     # test_data = NerfDataset("/DATA/nerf_synthetic/lego/transforms_test.json")
 
     k = 1
@@ -155,16 +156,19 @@ if __name__ == '__main__':
     #     plt.show()
 
 
+    total_depth_mse = 0
     total_mse = 0
-    for posei in trange(len(val_data.poses)):
-        c.pose = copy.deepcopy(val_data.poses[posei]).to(device)
+    for posei in trange(len(test_data.poses)):
+        c.pose = copy.deepcopy(test_data.poses[posei]).to(device)
         rgb, disp, acc, weights, depth = r.render()
         # im = (im - im.min()) / (im.max() - im.min())
         im = rgb.detach().cpu().numpy()
+        depth = depth.detach().cpu().numpy()
 
-        gt = val_data.images[posei][0]
+        gt = test_data.images[posei][0]
+        depth_gt = test_data.depths[posei]
 
-        plt.imshow(depth.detach().cpu().numpy())
+        plt.imshow(depth)
         plt.show()
         plt.imshow(cv2.cvtColor(im[:, :, 1:4], cv2.COLOR_BGR2RGB))
         plt.show()
@@ -172,9 +176,11 @@ if __name__ == '__main__':
         plt.show()
 
         total_mse += np.mean(np.square(im - gt))
+        total_depth_mse += np.mean(np.square(depth - depth_gt))
 
 
     print(f"val MSE = {total_mse / len(val_data.poses)}")
+    print(f"val DEPTH MSE = {total_depth_mse / len(val_data.poses)}")
 
 
     # for o in np.arange(0, 1, 1):

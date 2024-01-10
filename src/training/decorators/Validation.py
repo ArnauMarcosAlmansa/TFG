@@ -19,7 +19,7 @@ class Validation(TrainerDecorator):
         return summary
 
     def should_do_validation(self, epoch) -> bool:
-        return epoch % 10 == 0
+        return epoch % 10 == 0 and epoch != 0
 
     def do_validation(self):
         return self.validate(self.model(), self.loss(), self._data_loader)

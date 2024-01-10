@@ -316,6 +316,13 @@ def generate_multispectral_eo_dataset(scene, renderer, sun, meshes):
 
                 scene.remove_node(node)
 
+            node = scene.add(mesh)
+
+            color, depth = renderer.render(scene)
+            np.save(f"{folder}/{mode}/{image_index:010d}_DEPTH", depth)
+
+            scene.remove_node(node)
+
             jsdoc['frames'].append({
                 "transform_matrix": [
                     [float(pose[0, 0]), float(pose[0, 1]), float(pose[0, 2]), float(pose[0, 3])],
@@ -330,8 +337,37 @@ def generate_multispectral_eo_dataset(scene, renderer, sun, meshes):
 
             image_index += 1
 
-        json.dump(jsdoc, open(f"{folder}/transforms_{mode}.json", "wt"), indent=4)
+        # json.dump(jsdoc, open(f"{folder}/transforms_{mode}.json", "wt"), indent=4)
 
+
+def generate_depth_eo_dataset(scene, renderer, sun, meshes):
+    folder = "/home/amarcos/workspace/TFG/scripts/generated_neo_multispectral_data/"
+    modes = ["train", "val", "test"]
+
+    for mode in modes:
+        image_index = 1
+
+        os.makedirs(f"{folder}/{mode}", exist_ok=True)
+
+        jsdoc = json.load(open(f"{folder}/transforms_{mode}.json", "rt"))
+
+        for frame in jsdoc['frames']:
+            pose = np.array(frame["transform_matrix"])
+            # for (sunpose, ambient), time in [(sun.cycle(time), time) for time in np.arange(0, np.pi, 0.1)]:
+            scene.set_pose(camn, pose)
+
+            for mesh, bandname in zip([meshes[0]],
+                                      ["DEPTH"]):
+                node = scene.add(mesh)
+
+                color, depth = renderer.render(scene)
+                np.save(f"{folder}/{mode}/{image_index:010d}_DEPTH", depth)
+
+                scene.remove_node(node)
+            # scene.set_pose(sun.node, sunpose)
+            # scene.ambient_light = ambient
+
+            image_index += 1
 
 def interact(scene):
     pyrender.Viewer(scene)
@@ -380,9 +416,10 @@ if __name__ == '__main__':
     camn = scene.add(camera, pose=camera_pose)
 
     r = pyrender.OffscreenRenderer(800, 800)
-    generate_multispectral_eo_dataset(scene, r, sun, meshes)
-
-    # interact(scene)
+    # generate_multispectral_eo_dataset(scene, r, sun, meshes)
+    # generate_depth_eo_dataset(scene, r, sun, meshes)
+    #
+    interact(scene)
     # r = pyrender.OffscreenRenderer(120, 120)
     # generate_eo_dataset(scene, r, sun)
 
