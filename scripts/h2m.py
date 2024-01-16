@@ -1,5 +1,6 @@
 import json
 import os
+import random
 import time
 
 import cv2
@@ -170,7 +171,47 @@ def make_terrains(dem_file, bands_folder, bands_name):
         mesh = make_mesh([prim])
         meshes.append(mesh)
 
-    return meshes
+    return meshes, pts
+
+
+def make_cube(pose, texture):
+    mesh = trimesh.creation.box(transform=pose)
+    mesh.visual = trimesh.visual.TextureVisuals(
+        uv=np.array([[0, 0], [0, 1], [1, 0], [1, 1], [0, 0], [0, 1], [1, 0], [1, 1], ]),
+        image=texture
+    )
+    return mesh
+
+def make_cubes():
+    poses = [
+        scale(np.eye(4), 0.05),
+        scale(np.eye(4), 0.05),
+        scale(np.eye(4), 0.05),
+        scale(np.eye(4), 0.05),
+        scale(np.eye(4), 0.05),
+        scale(np.eye(4), 0.05),
+    ]
+    properties = [
+        (1, 0),
+        (0.8, 0.2),
+        (0.6, 0.4),
+        (0.4, 0.6),
+        (0.8, 0.2),
+        (0, 1),
+    ]
+    image = cv2.imread("tejado.jpg", cv2.IMREAD_GRAYSCALE)
+
+    cubes = []
+    for pose, (rough, metal) in zip(poses, properties):
+        cube = pyrender.Mesh.from_trimesh(make_cube(pose, image))
+        cube.primitives[0].material.RoughnessFactor = rough
+        cube.primitives[0].material.metallicFactor = metal
+        # cube.primitives[0].material.textures.add(texture)
+        # cube.primitives[0].texcoord_0 = np.array([[0, 0], [0, 1], [1, 0], [1, 1], [0, 0], [0, 1], [1, 0], [1, 1], ])
+        # cube.primitives[0].buf_flags = 4
+        cubes.append(cube)
+
+    return cubes
 
 
 def lookAt(center, target, up):
@@ -189,6 +230,9 @@ def lookAt(center, target, up):
 
     return m
 
+
+def scale(pose, factor):
+    return pose @ np.array([[factor, 0, 0, 0], [0, factor, 0, 0], [0, 0, factor, 0], [0, 0, 0, factor]])
 
 def rotx(pose, a):
     rot = np.eye(4)
@@ -290,7 +334,7 @@ def generate_eo_dataset(scene, renderer, sun):
 
 
 def generate_multispectral_eo_dataset(scene, renderer, sun, meshes):
-    folder = "/home/amarcos/workspace/TFG/scripts/generated_neo_multispectral_data/"
+    folder = "/home/amarcos/workspace/TFG/scripts/generated_neo_multispectral_cubes_data/"
     modes = ["train", "val", "test"]
 
     for mode in modes:
@@ -341,7 +385,7 @@ def generate_multispectral_eo_dataset(scene, renderer, sun, meshes):
 
 
 def generate_depth_eo_dataset(scene, renderer, sun, meshes):
-    folder = "/home/amarcos/workspace/TFG/scripts/generated_neo_multispectral_data/"
+    folder = "/home/amarcos/workspace/TFG/scripts/generated_neo_multispectral_cubes_data/"
     modes = ["train", "val", "test"]
 
     for mode in modes:
@@ -374,7 +418,7 @@ def interact(scene):
 
 
 if __name__ == '__main__':
-    meshes = make_terrains(
+    meshes, pts = make_terrains(
         "/data1tb/BigEarthNet-S2-v1.0/BigEarthNet-S2-v1.0/dem/S2B_MSIL2A_20170709T094029_78_59_dem.tif",
         "/data1tb/BigEarthNet-S2-v1.0/BigEarthNet-S2-v1.0/BigEarthNet-v1.0/",
         "S2B_MSIL2A_20170709T094029_78_59"
@@ -385,7 +429,7 @@ if __name__ == '__main__':
 
     scene = pyrender.Scene(ambient_light=np.array([1.0, 1.0, 1.0]))
     # scene = pyrender.Scene()
-    # scene.add(meshes[1])
+    scene.add(meshes[1])
     #     scene.add(cam)
     # sunlight = scene.add(light, pose=rotx(np.eye(4), np.pi / 2 - 0.3))
     sunlight = scene.add(light, pose=rotx(np.eye(4), 0))
@@ -414,6 +458,17 @@ if __name__ == '__main__':
     # camera_pose = rotation * camera_pose
     camera_pose[:3, :3] = rotation[:3, :3]
     camn = scene.add(camera, pose=camera_pose)
+
+    cubes = make_cubes()
+    cube_pose = np.array([
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ])
+    point = pts[random.randint(0, 959), random.randint(0, 959)]
+    cube_pose[:3, 3] = point
+    scene.add(cubes[4], pose=cube_pose)
 
     r = pyrender.OffscreenRenderer(800, 800)
     # generate_multispectral_eo_dataset(scene, r, sun, meshes)
