@@ -12,6 +12,8 @@ import pyrender
 from matplotlib import pyplot as plt
 import pickle
 
+from pyrender import RenderFlags
+
 
 class Sun:
     def __init__(self, node: pyrender.Node):
@@ -33,9 +35,17 @@ def load_dem(filename, upscale=8, blur=17):
 
     plt.imsave("dem.png", (dem - dem.min()) / (dem.max() - dem.min()), cmap='gray')
 
+    row, col = dem.shape
+    mean = 0
+    sigma = 0.5
+    gauss = np.random.uniform(-sigma, sigma, (row, col))
+    gauss = gauss.reshape(row, col)
+    dem = dem + gauss
+    # dem2 = cv2.GaussianBlur(dem2, (blur, blur), 0)
+    # dem = cv2.resize(dem2, (dem.shape[1], dem.shape[0]))
     dem2 = cv2.resize(dem, (dem.shape[1] * upscale, dem.shape[0] * upscale))
     dem2 = cv2.GaussianBlur(dem2, (blur, blur), 0)
-    # dem = cv2.resize(dem2, (dem.shape[1], dem.shape[0]))
+    # plt.imsave("dem2.png", (dem2 - dem2.min()) / (dem2.max() - dem2.min()), cmap='gray')
     return dem2
 
 
@@ -132,7 +142,8 @@ def make_triangles(points):
 
 def make_material(image):
     texture = pyrender.Texture(source=image, source_channels='RGB')
-    return pyrender.MetallicRoughnessMaterial(baseColorTexture=texture)
+    material = pyrender.MetallicRoughnessMaterial(baseColorTexture=texture, metallicFactor=0)
+    return material
 
 
 def make_primitive(points, uvs, material):
@@ -184,20 +195,20 @@ def make_cube(pose, texture):
 
 def make_cubes():
     poses = [
-        scale(np.eye(4), 0.05),
-        scale(np.eye(4), 0.05),
-        scale(np.eye(4), 0.05),
-        scale(np.eye(4), 0.05),
-        scale(np.eye(4), 0.05),
-        scale(np.eye(4), 0.05),
+        roty(scale(np.eye(4), 0.05), np.pi / 2),
+        roty(scale(np.eye(4), 0.05), np.pi / 2),
+        roty(scale(np.eye(4), 0.05), np.pi / 2),
+        roty(scale(np.eye(4), 0.05), np.pi / 2),
+        roty(scale(np.eye(4), 0.05), np.pi / 2),
+        roty(scale(np.eye(4), 0.05), np.pi / 2),
     ]
     properties = [
-        (1, 0),
+        (0.9, 0),
         (0.8, 0.2),
         (0.6, 0.4),
-        (0.4, 0.6),
-        (0.8, 0.2),
-        (0, 1),
+        (0.6, 0.6),
+        (0.6, 0.8),
+        (0.6, 0.9),
     ]
     image = cv2.imread("tejado.jpg", cv2.IMREAD_GRAYSCALE)
 
@@ -206,9 +217,6 @@ def make_cubes():
         cube = pyrender.Mesh.from_trimesh(make_cube(pose, image))
         cube.primitives[0].material.RoughnessFactor = rough
         cube.primitives[0].material.metallicFactor = metal
-        # cube.primitives[0].material.textures.add(texture)
-        # cube.primitives[0].texcoord_0 = np.array([[0, 0], [0, 1], [1, 0], [1, 1], [0, 0], [0, 1], [1, 0], [1, 1], ])
-        # cube.primitives[0].buf_flags = 4
         cubes.append(cube)
 
     return cubes
@@ -353,7 +361,7 @@ def generate_multispectral_eo_dataset(scene, renderer, sun, meshes):
                                        "B8A", ]):
                 node = scene.add(mesh)
 
-                color, depth = renderer.render(scene)
+                color, depth = renderer.render(scene, flags=RenderFlags.SHADOWS_ALL | RenderFlags.ALL_SOLID)
 
                 bgr = cv2.cvtColor(color, cv2.COLOR_RGB2BGR)
                 cv2.imwrite(f"{folder}/{mode}/{image_index:010d}_{bandname}.png", bgr)
@@ -381,7 +389,7 @@ def generate_multispectral_eo_dataset(scene, renderer, sun, meshes):
 
             image_index += 1
 
-        # json.dump(jsdoc, open(f"{folder}/transforms_{mode}.json", "wt"), indent=4)
+        json.dump(jsdoc, open(f"{folder}/transforms_{mode}.json", "wt"), indent=4)
 
 
 def generate_depth_eo_dataset(scene, renderer, sun, meshes):
@@ -414,7 +422,7 @@ def generate_depth_eo_dataset(scene, renderer, sun, meshes):
             image_index += 1
 
 def interact(scene):
-    pyrender.Viewer(scene)
+    pyrender.Viewer(scene, render_flags={"shadows": True})
 
 
 if __name__ == '__main__':
@@ -432,7 +440,7 @@ if __name__ == '__main__':
     scene.add(meshes[1])
     #     scene.add(cam)
     # sunlight = scene.add(light, pose=rotx(np.eye(4), np.pi / 2 - 0.3))
-    sunlight = scene.add(light, pose=rotx(np.eye(4), 0))
+    sunlight = scene.add(light, pose=roty(np.eye(4), np.pi / 4))
     # pyrender.Viewer(scene, render_flags={'shadows': True})
     #
     # exit()
@@ -466,15 +474,18 @@ if __name__ == '__main__':
         [0.0, 0.0, 1.0, 0.0],
         [0.0, 0.0, 0.0, 1.0],
     ])
-    point = pts[random.randint(0, 959), random.randint(0, 959)]
-    cube_pose[:3, 3] = point
-    scene.add(cubes[4], pose=cube_pose)
+
+    for cube in cubes:
+        point = pts[random.randint(0, 959), random.randint(0, 959)]
+        cube_pose_copy = np.copy(cube_pose)
+        cube_pose_copy[:3, 3] = point
+        scene.add(cube, pose=cube_pose_copy)
 
     r = pyrender.OffscreenRenderer(800, 800)
-    # generate_multispectral_eo_dataset(scene, r, sun, meshes)
+    generate_multispectral_eo_dataset(scene, r, sun, meshes)
     # generate_depth_eo_dataset(scene, r, sun, meshes)
     #
-    interact(scene)
+    # interact(scene)
     # r = pyrender.OffscreenRenderer(120, 120)
     # generate_eo_dataset(scene, r, sun)
 
