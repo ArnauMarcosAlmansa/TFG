@@ -35,17 +35,25 @@ def load_dem(filename, upscale=8, blur=17):
 
     plt.imsave("dem.png", (dem - dem.min()) / (dem.max() - dem.min()), cmap='gray')
 
-    row, col = dem.shape
-    mean = 0
-    sigma = 0.5
-    gauss = np.random.uniform(-sigma, sigma, (row, col))
-    gauss = gauss.reshape(row, col)
-    dem = dem + gauss
-    # dem2 = cv2.GaussianBlur(dem2, (blur, blur), 0)
-    # dem = cv2.resize(dem2, (dem.shape[1], dem.shape[0]))
-    dem2 = cv2.resize(dem, (dem.shape[1] * upscale, dem.shape[0] * upscale))
-    dem2 = cv2.GaussianBlur(dem2, (blur, blur), 0)
-    # plt.imsave("dem2.png", (dem2 - dem2.min()) / (dem2.max() - dem2.min()), cmap='gray')
+    h, w = dem.shape
+    k = 2
+    dem2 = dem
+    dem2 = dem2 + (np.random.uniform(size=(h, w)) * k - (k / 2))
+    k = k / 4
+    dem2 = cv2.resize(dem2, (h * 2, w * 2))
+    dem2 = dem2 + (np.random.uniform(size=(h * 2, w * 2)) * k - (k / 2))
+    k = k / 4
+    dem2 = cv2.resize(dem2, (h * 4, w * 4))
+    dem2 = dem2 + (np.random.uniform(size=(h * 4, w * 4)) * k - (k / 2))
+    k = k / 4
+    dem2 = cv2.resize(dem2, (h * 8, w * 8))
+    dem2 = dem2 + (np.random.uniform(size=(h * 8, w * 8)) * k - (k / 2))
+
+    # dem2 = cv2.resize(dem, (h * 32, w * 32))
+    # s = 51
+    # dem2 = cv2.GaussianBlur(dem2, (s, s), sigmaX=s / 6)
+
+    plt.imsave("dem2.png", (dem2 - dem2.min()) / (dem2.max() - dem2.min()), cmap='gray')
     return dem2
 
 
@@ -476,16 +484,17 @@ if __name__ == '__main__':
     ])
 
     for cube in cubes:
-        point = pts[random.randint(0, 959), random.randint(0, 959)]
+        quarter = 960 // 4
+        point = pts[random.randint(quarter, 960 - quarter), random.randint(quarter, 960 - quarter)]
         cube_pose_copy = np.copy(cube_pose)
         cube_pose_copy[:3, 3] = point
         scene.add(cube, pose=cube_pose_copy)
 
     r = pyrender.OffscreenRenderer(800, 800)
-    generate_multispectral_eo_dataset(scene, r, sun, meshes)
+    # generate_multispectral_eo_dataset(scene, r, sun, meshes)
     # generate_depth_eo_dataset(scene, r, sun, meshes)
     #
-    # interact(scene)
+    interact(scene)
     # r = pyrender.OffscreenRenderer(120, 120)
     # generate_eo_dataset(scene, r, sun)
 

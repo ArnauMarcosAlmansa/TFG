@@ -28,7 +28,7 @@ from src.volume_render.SimpleRenderer import SimpleRenderer
 class Test2(t.nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        width = 256 * 4
+        width = 256
         self.encode_points = Mapping(10, 3)
         self.encode_viewdirs = Mapping(4, 3)
         self.block1 = t.nn.Sequential(
@@ -48,6 +48,48 @@ class Test2(t.nn.Module):
             t.nn.Linear(width + 60, width),
             t.nn.ReLU(),
             t.nn.Linear(width, width),
+            t.nn.ReLU(),
+            t.nn.Linear(width, width),
+            t.nn.Linear(width, width + 1),
+        )
+
+        self.block3 = t.nn.Sequential(
+            t.nn.Linear(width + 24, width // 2),
+            t.nn.ReLU(),
+            t.nn.Linear(width // 2, 12),
+        )
+
+    def forward(self, x):
+        points = x[:, 0:3]
+        viewdirs = x[:, 3:6]
+        points = self.encode_points(points)
+        viewdirs = self.encode_viewdirs(viewdirs)
+        y = self.block1(points)
+        y = torch.cat([y, points], -1)
+        y = self.block2(y)
+        density = y[:, -1]
+        y = torch.cat([y[:, :-1], viewdirs], -1)
+        color = self.block3(y)
+        return color, density,
+
+
+class Mini(t.nn.Module):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        width = 128
+        self.encode_points = Mapping(10, 3)
+        self.encode_viewdirs = Mapping(4, 3)
+        self.block1 = t.nn.Sequential(
+            t.nn.Linear(60, width),
+            t.nn.ReLU(),
+            t.nn.Linear(width, width),
+            t.nn.ReLU(),
+            t.nn.Linear(width, width),
+            t.nn.ReLU(),
+        )
+
+        self.block2 = t.nn.Sequential(
+            t.nn.Linear(width + 60, width),
             t.nn.ReLU(),
             t.nn.Linear(width, width),
             t.nn.Linear(width, width + 1),
@@ -120,7 +162,7 @@ if __name__ == '__main__':
     # trainer = Validation(trainer, val_loader)
     trainer = Tensorboard(trainer)
 
-    loop = TrainLoopWithCheckpoints(trainer, "./checkpoints_multinerf_neo/")
+    loop = TrainLoopWithCheckpoints(trainer, "./checkpoints_multinerf_neo_cubes/")
 
     loop.train(0)
 
