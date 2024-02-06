@@ -46,10 +46,11 @@ depth_mses = [
 avg_mses = [statistics.mean(mses_for_dist) for mses_for_dist in mses]
 avg_depth_mses = [statistics.mean(mses_for_dist) for mses_for_dist in depth_mses]
 
-for mse, depth_mse in zip(avg_mses, avg_depth_mses):
-    print(f"{mse:.6f}\t{depth_mse:.6f}")
+std_mses = [statistics.stdev(mses_for_dist) for mses_for_dist in mses]
+std_depth_mses = [statistics.stdev(mses_for_dist) for mses_for_dist in depth_mses]
 
-exit()
+for mse, depth_mse, std_mse, std_depth_mse in zip(avg_mses, avg_depth_mses, std_mses, std_depth_mses):
+    print(f"{mse:.6f} {std_mse:.10f}\t{depth_mse:.6f} {std_depth_mse:.10f}")
 
 plt.grid()
 plt.plot(dists, avg_mses)
