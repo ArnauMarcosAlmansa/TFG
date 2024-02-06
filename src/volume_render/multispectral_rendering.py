@@ -77,7 +77,7 @@ def rebuild_rgb(im4: torch.Tensor):
     rgb_im[:, :, 2] = im4[:, :, 3]
     rgb_im[:, :, 1] = im4[:, :, 1] - 0.5 * im4[:, :, 0] + im4[:, :, 2] - 0.5 * im4[:, :, 3]
 
-    return rgb_im
+    return rgb_im.clip(0.0, 1.0)
 
 if __name__ == '__main__':
     fix_cuda()
@@ -90,8 +90,8 @@ if __name__ == '__main__':
     ]
 
     # data = SyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_eo_test_data/")
-    train_data = MultiSpectralNerfDataset("/DATA/nerf_synthetic/ship/transforms_train.json", bands, size=80)
-    val_data = MultiSpectralNerfDataset("/DATA/nerf_synthetic/ship/transforms_val.json", bands, size=80)
+    train_data = MultiSpectralNerfDataset("/home/arnau-marcos-almansa/Downloads/nerf_synthetic/ship/transforms_train.json", bands, size=80)
+    val_data = MultiSpectralNerfDataset("/home/arnau-marcos-almansa/Downloads/nerf_synthetic/ship/transforms_val.json", bands, size=80)
     # test_data = NerfDataset("/DATA/nerf_synthetic/lego/transforms_test.json")
 
     k = 1
@@ -110,7 +110,7 @@ if __name__ == '__main__':
 
     # r.render_arbitrary_rays(torch.tensor([[0, 0, 0]], device=device), torch.tensor([[1, 0, 0]], device=device))
 
-    trainer = StaticRenderTrainer(model, optim, loss, train_loader, 'FICUS_80', renderer=r)
+    trainer = StaticRenderTrainer(model, optim, loss, train_loader, 'SHIP_80', renderer=r)
     # trainer = Validation(trainer, r, val_loader)
     # trainer = VisualValidation(trainer, r, val_data)
     # trainer = Validation(trainer, val_loader)
@@ -128,6 +128,23 @@ if __name__ == '__main__':
     c.pose = train_data.pose
     images = []
 
+    def calc_psnr(mse):
+        return 20 * np.log10(1.0 / mse)
+
+    total_mse = 0
+    for posei in range(len(val_data.images)):
+        c.pose = copy.deepcopy(val_data.poses[posei]).to(device)
+        color, disp, acc, weights, depth = r.render()
+        rgb = rebuild_rgb(color.cpu().numpy())
+        og_rgb = rebuild_rgb(val_data.images[posei][0])
+
+        total_mse += torch.mean(torch.square(torch.from_numpy(og_rgb) - torch.from_numpy(rgb)))
+
+    print("MSE", total_mse / len(val_data.images))
+    print("PSNR", calc_psnr(total_mse / len(val_data.images)))
+
+
+
     posei = random.randint(0, len(train_data.poses) - 1)
     for o in np.arange(0, 1, 1):
         print(o)
@@ -136,20 +153,29 @@ if __name__ == '__main__':
         # im = (im - im.min()) / (im.max() - im.min())
         im = rgb.detach().cpu().numpy()
         images.append(im)
-        plt.imshow(images[-1][:, :, 0], cmap='gray')
-        plt.show()
-        plt.imshow(images[-1][:, :, 1], cmap='gray')
-        plt.show()
-        plt.imshow(images[-1][:, :, 2], cmap='gray')
-        plt.show()
-        plt.imshow(images[-1][:, :, 3], cmap='gray')
-        plt.show()
-        plt.imshow(rebuild_rgb(images[-1]))
-        plt.show()
-        plt.imshow(rebuild_rgb(train_data.images[posei][0]))
-        plt.show()
-        plt.imshow(depth.detach().cpu().numpy())
-        plt.show()
+        # plt.imsave("rendered_ship_channel_0.png", images[-1][:, :, 0], cmap='gray')
+        # plt.show()
+        # plt.imsave("rendered_ship_channel_1.png", images[-1][:, :, 1], cmap='gray')
+        # plt.show()
+        # plt.imsave("rendered_ship_channel_2.png", images[-1][:, :, 2], cmap='gray')
+        # plt.show()
+        # plt.imsave("rendered_ship_channel_3.png", images[-1][:, :, 3], cmap='gray')
+        # plt.show()
+        # plt.imsave("rendered_ship_rgb.png", rebuild_rgb(images[-1]))
+        # plt.show()
+        # plt.imsave("original_ship_rgb.png", rebuild_rgb(train_data.images[posei][0]))
+        # plt.imsave("original_ship_channel_0.png", train_data.images[posei][0][:, :, 0], cmap='gray')
+        # plt.show()
+        # plt.imsave("original_ship_channel_1.png", train_data.images[posei][0][:, :, 1], cmap='gray')
+        # plt.show()
+        # plt.imsave("original_ship_channel_2.png", train_data.images[posei][0][:, :, 2], cmap='gray')
+        # plt.show()
+        # plt.imsave("original_ship_channel_3.png", train_data.images[posei][0][:, :, 3], cmap='gray')
+        # plt.show()
+        # plt.imsave("rendered_ship_depth.png", depth.detach().cpu().numpy())
+        # plt.show()
+
+
 
 
     # for o in np.arange(0, 1, 1):
@@ -165,7 +191,7 @@ if __name__ == '__main__':
 
     os.environ['IMAGEIO_FFMPEG_EXE'] = '/usr/bin/ffmpeg'
 
-    writer = imageio.get_writer('FICUS_80.mp4', fps=10)
+    writer = imageio.get_writer('SHIP_80.mp4', fps=10)
 
     for im in images:
         writer.append_data(im)
