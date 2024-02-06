@@ -150,6 +150,23 @@ if __name__ == '__main__':
     c.pose = train_data.pose
     images = []
 
+
+    def calc_psnr(mse):
+        return 20 * np.log10(1.0 / mse)
+
+    total_mse = 0
+    for posei in range(len(val_data.images)):
+        print(f"{posei} / {len(val_data.images)}")
+        c.pose = copy.deepcopy(val_data.poses[posei]).to(device)
+        color, disp, acc, weights, depth = r.render()
+        rgb = color.cpu().numpy()
+        og_rgb = val_data.images[posei][0][:, :, :3]
+
+        total_mse += torch.mean(torch.square(torch.from_numpy(og_rgb) - torch.from_numpy(rgb)))
+
+    print("MSE", total_mse / len(val_data.images))
+    print("PSNR", calc_psnr(total_mse / len(val_data.images)))
+
     posei = random.randint(0, len(train_data.poses) - 1)
     for o in np.arange(0, 1, 1):
         print(o)
