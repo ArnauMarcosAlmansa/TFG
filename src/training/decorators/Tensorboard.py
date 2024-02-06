@@ -8,7 +8,7 @@ from src.training.decorators.TrainerDecorator import TrainerDecorator
 class Tensorboard(TrainerDecorator):
     def __init__(self, trainer: AbstractTrainer):
         super().__init__(trainer)
-        self.summary = SummaryWriter()
+        self.summary = SummaryWriter("./runs/" + trainer.name())
 
     def train_one_epoch(self, epoch):
         summary: EpochSummary = self._trainer.train_one_epoch(epoch)

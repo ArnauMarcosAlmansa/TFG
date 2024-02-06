@@ -4,11 +4,6 @@ from src.training.EpochSummary import EpochSummary
 
 
 class AbstractTrainer(ABC):
-
-    @abstractmethod
-    def train(self, epochs):
-        pass
-
     @abstractmethod
     def train_one_epoch(self, epoch) -> EpochSummary:
         pass
@@ -28,3 +23,10 @@ class AbstractTrainer(ABC):
     @abstractmethod
     def name(self):
         pass
+
+
+class AbstractTrainLoop(ABC):
+    @abstractmethod
+    def train(self, epochs):
+        pass
+

@@ -1,0 +1,27 @@
+en las listas poner mayusculas y puntos
+en las formulas separar con comas y puntos como texto normal
+
+reducir la parte de SOTA, sobre todo los que no utilizo
+en el development, explicar las herramientas que has usado (pytorch, ide, librerias)
+en development, explicar que has optado por hacer el nerf desde cero, haciendo pruebas con algo del SOTA
+
+en los objetivos: 1 parrafo de objetivo principal, 1 parrafo de subobjetivos, y 1 parrafo de como he planificado los objetivos (divididos en tareas, planificados, ), 1 parrafo de metodologia
+
+lista de bandas cambiar por tabla,
+ejemplos visuales de imagenes del sentinel 2 (ben-ge), y del dataset del blender
+
+en vez de la foto grande del DEM, poner el DEM + visualizacion al lado
+captions más largas, que expliquen la imagen, que la figura con el caption se explique todo
+
+poner figuras "antes de y despues de" (del color RGB vs las 12 bandas, de sin sombras a con sombras) pequeñas en una sola fila
+
+(resultados poner cmabios de tiempo con el pos encoding)
+
+mover lo de los cuatro canales a apendices, pero dejar la explicacion
+
+
+(experimentos: RGB con las diferentes alturas, RGB pruebas con el positional encoding, experimento 12 bandas: sin luz ni cubos, con lus, con cubos, con luz y cubos)
+
+
+(probar rangos de altura de la camara: 10, 20, 40, 80)
+
