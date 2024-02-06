@@ -22,3 +22,4 @@ The [scripts](scripts) folder contains some scripts I have used on this project.
 
 The most important script is [scripts/h2m.py](scripts/h2m.py) which I have used to generate the datasets.
 
+The [docs](docs) folder contains a copy of the article. 
