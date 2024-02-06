@@ -154,7 +154,7 @@ if __name__ == '__main__':
     for o in np.arange(0, 1, 1):
         print(o)
         c.pose = copy.deepcopy(train_data.poses[posei]).to(device)
-        rgb, disp, acc, weights, depth = r.render()
+        rgb, weights, depth = r.render()
         # im = (im - im.min()) / (im.max() - im.min())
         im = (rgb.detach().cpu().numpy() * 255).astype(np.uint8)
         images.append(im)
