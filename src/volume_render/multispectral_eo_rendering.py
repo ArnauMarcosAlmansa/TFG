@@ -25,6 +25,21 @@ from src.volume_render.cameras.PinholeCamera import PinholeCamera
 from src.volume_render.SimpleRenderer import SimpleRenderer
 
 
+BAND_NAMES = [
+    "B01",
+    "B02",
+    "B03",
+    "B04",
+    "B05",
+    "B06",
+    "B07",
+    "B08",
+    "B09",
+    "B11",
+    "B12",
+    "B8A",
+]
+
 class Test2(t.nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -148,7 +163,7 @@ if __name__ == '__main__':
     val_loader = torch.utils.data.DataLoader(val_data, shuffle=True, batch_size=512 * k, generator=torch.Generator(device='cuda'), num_workers=4)
 #     test_loader = torch.utils.data.DataLoader(test_data, shuffle=True, batch_size=1024 * 8)
 
-    c = PinholeCamera(800, 800, train_data.focal, train_data.pose, 3, 7)
+    c = PinholeCamera(800, 800, train_data.focal, train_data.pose, 3, 8)
     model = Test2().to(device)
     loss = t.nn.MSELoss()
     optim = t.optim.RAdam(params=model.parameters(), lr=0.0005 * k, betas=(0.9, 0.999))
@@ -209,6 +224,15 @@ if __name__ == '__main__':
 
         gt = test_data.images[posei][0]
         depth_gt = test_data.depths[posei]
+
+        for i, band in zip(range(12), BAND_NAMES):
+            cv2.imwrite(f"reconstructed-{band}.png", (im[:, :, i] * 255).astype(np.uint8))
+            cv2.imwrite(f"original-{band}.png", (gt[:, :, i] * 255).astype(np.uint8))
+
+        plt.imshow(depth)
+        plt.imsave(f"reconstructed-DEPTH.png")
+        plt.imshow(depth_gt)
+        plt.imsave(f"original-DEPTH.png")
 
         plt.imshow(depth)
         plt.show()

@@ -9,7 +9,20 @@ from src.config import device
 from src.volume_render.cameras.PinholeCamera import PinholeCamera
 
 
-BAND_NAMES = ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B08", "B09", "B11", "B12", "B8A", ]
+BAND_NAMES = [
+    "B01",
+    "B02",
+    "B03",
+    "B04",
+    "B05",
+    "B06",
+    "B07",
+    "B08",
+    "B09",
+    "B11",
+    "B12",
+    "B8A",
+]
 
 class MultispectralSyntheticEODataset:
     def __init__(self, json_path, transform=None, size=800):
