@@ -49,49 +49,38 @@ class SimpleRenderer:
 
         return rgb
 
-    def raw2outputs(self, rgb_slices, density_slices, z_vals, rays_d, raw_noise_std=0, white_bkgd=False):
-        raw2alpha = lambda raw, dists, act_fn=F.relu: 1. - torch.exp(-act_fn(raw) * dists)
-
-        dists = z_vals[..., 1:] - z_vals[..., :-1]
-        dists = torch.cat([dists, torch.Tensor([1e10]).to(device).expand(dists[..., :1].shape)],
+    def raw2outputs(self, color_slices, density_slices, z_vals, rays_directions):
+        # calcular las distancias entre muestras para poder calcular el alpha
+        distances_between_samples = z_vals[..., 1:] - z_vals[..., :-1]
+        distances_between_samples = torch.cat([distances_between_samples, torch.Tensor([1e10]).to(device).expand(distances_between_samples[..., :1].shape)],
                           -1)  # [N_rays, N_samples]
+        distances_between_samples = distances_between_samples * torch.norm(rays_directions[..., None, :], dim=-1)
 
-        dists = dists * torch.norm(rays_d[..., None, :], dim=-1)
+        # activacion de las densidades
+        densities = F.relu(density_slices)
+        # calcular alpha
+        alpha = 1. - torch.exp(-densities * distances_between_samples)
+        # calcular pesos
+        weights = alpha * torch.cumprod(torch.cat([torch.ones((alpha.shape[0], 1)), 1. - alpha + 1e-10], -1), -1)[:, :-1]
+        # calcular profundidad
+        depths = torch.sum(weights * z_vals, -1)
 
-        rgb = torch.sigmoid(rgb_slices)  # [N_rays, N_samples, 3]
-        noise = 0.
-        if raw_noise_std > 0.:
-            noise = torch.randn(density_slices.shape) * raw_noise_std
+        # activacion del color
+        color = torch.sigmoid(color_slices)  # [N_rays, N_samples, N_channels]
+        # integrar el color
+        rgb_map = torch.sum(weights[..., None] * color, -2)  # [N_rays, N_channels]
 
-        alpha = raw2alpha(density_slices + noise, dists)  # [N_rays, N_samples]
-        # weights = alpha * tf.math.cumprod(1.-alpha + 1e-10, -1, exclusive=True)
-        weights = alpha * torch.cumprod(torch.cat([torch.ones((alpha.shape[0], 1)), 1. - alpha + 1e-10], -1), -1)[:,
-                          :-1]
-        rgb_map = torch.sum(weights[..., None] * rgb, -2)  # [N_rays, 3]
-
-        depth_map = torch.sum(weights * z_vals, -1)
-        disp_map = 1. / torch.max(1e-10 * torch.ones_like(depth_map), depth_map / torch.sum(weights, -1))
-        acc_map = torch.sum(weights, -1)
-
-        if white_bkgd:
-            rgb_map = rgb_map + (1. - acc_map[..., None])
-
-        return rgb_map, disp_map, acc_map, weights, depth_map
+        return rgb_map, weights, depths
 
     def render_arbitrary_rays(self, rays_o, rays_d):
-        # cuanta distancia tiene que avanzar el rayo cada iteracion
-        step = (self.camera.far - self.camera.near) / self.n_samples
-        rays_steps = rays_d * step
-
         t_vals = torch.linspace(0., 1., steps=self.n_samples, device=device)
         z_vals = self.camera.near * (1. - t_vals) + self.camera.far * (t_vals)
 
+        # añadir ruido a las muestras para evitar el overfitting
         if self.perturb:
-            # get intervals between samples
             mids = .5 * (z_vals[..., 1:] + z_vals[..., :-1])
             upper = torch.cat([mids, z_vals[..., -1:]], -1)
             lower = torch.cat([z_vals[..., :1], mids], -1)
-            # stratified samples in those intervals
             t_rand = torch.rand(z_vals.shape)
 
             z_vals = lower + (upper - lower) * t_rand
@@ -111,25 +100,21 @@ class SimpleRenderer:
         rgb_slices = torch.reshape(rgb_slices, (shape[0], shape[1], self.n_channels))
         density_slices = torch.reshape(density_slices, (shape[0], shape[1]))
 
-        rgb_map, disp_map, acc_map, weights, depth_map = self.raw2outputs(rgb_slices, density_slices, z_vals, rays_d)
+        rgb_map, weights, depth_map = self.raw2outputs(rgb_slices, density_slices, z_vals, rays_d)
 
-        return rgb_map, disp_map, acc_map, weights, depth_map
+        return rgb_map, weights, depth_map
 
     def render_matrix_rays(self, rays_o, rays_d):
         rgb = t.zeros((self.camera.h, self.camera.w, self.n_channels)).to(device)
-        disp = t.zeros((self.camera.h, self.camera.w)).to(device)
-        acc = t.zeros((self.camera.h, self.camera.w)).to(device)
         weights = t.zeros((self.camera.h, self.camera.w, self.n_samples)).to(device)
         depth = t.zeros((self.camera.h, self.camera.w)).to(device)
         for i in range(rgb.shape[0]):
-            rgb_map, disp_map, acc_map, weights_map, depth_map = self.render_arbitrary_rays(rays_o[i], rays_d[i])
+            rgb_map, weights_map, depth_map = self.render_arbitrary_rays(rays_o[i], rays_d[i])
             rgb[i] = rgb_map.detach()
-            disp[i] = disp_map.detach()
-            acc[i] = acc_map.detach()
             weights[i] = weights_map.detach()
             depth[i] = depth_map.detach()
 
-        return rgb, disp, acc, weights, depth
+        return rgb, weights, depth
 
     def render(self):
         rays_o, rays_d = self.camera.get_rays()
