@@ -202,7 +202,7 @@ if __name__ == '__main__':
     total_mse = 0
     for posei in trange(len(test_data.poses)):
         c.pose = copy.deepcopy(test_data.poses[posei]).to(device)
-        rgb, disp, acc, weights, depth = r.render()
+        rgb, weights, depth = r.render()
         # im = (im - im.min()) / (im.max() - im.min())
         im = rgb.detach().cpu().numpy()
         depth = depth.detach().cpu().numpy()
