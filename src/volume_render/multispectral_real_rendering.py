@@ -11,6 +11,7 @@ import torch.utils.data
 from tqdm import trange
 
 from src.config import device, fix_cuda
+from src.dataloaders.MultispectralRealDataloader import MultispectralRealDataset
 from src.dataloaders.MultispectralSyntheticEODataloader import MultispectralSyntheticEODataset
 from src.dataloaders.NerfDataloader import NerfDataset, MultiSpectralNerfDataset
 from src.dataloaders.SyntheticDataloader import SyntheticEODataset
@@ -26,18 +27,14 @@ from src.volume_render.SimpleRenderer import SimpleRenderer
 
 
 BAND_NAMES = [
-    "B01",
-    "B02",
-    "B03",
-    "B04",
-    "B05",
-    "B06",
-    "B07",
-    "B08",
-    "B09",
-    "B11",
-    "B12",
-    "B8A",
+    "BP850-27",
+    "BP635-27",
+    "BP590-27",
+    "BP525-27",
+    "BP505-27",
+    "BP470-27",
+    "BP324-27",
+    "BP550-27",
 ]
 
 class Test2(t.nn.Module):
@@ -71,7 +68,7 @@ class Test2(t.nn.Module):
         self.block3 = t.nn.Sequential(
             t.nn.Linear(width + 24, width // 2),
             t.nn.ReLU(),
-            t.nn.Linear(width // 2, 12),
+            t.nn.Linear(width // 2, 8),
         )
 
     def forward(self, x):
@@ -113,7 +110,7 @@ class Mini(t.nn.Module):
         self.block3 = t.nn.Sequential(
             t.nn.Linear(width + 24, width // 2),
             t.nn.ReLU(),
-            t.nn.Linear(width // 2, 12),
+            t.nn.Linear(width // 2, 8),
         )
 
     def forward(self, x):
@@ -150,41 +147,35 @@ if __name__ == '__main__':
     ]
 
     # data = SyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_eo_test_data/")
-    train_data = MultispectralSyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_neo_multispectral_data/transforms_train.json", bands, size=800)
-    val_data = MultispectralSyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_neo_multispectral_data/transforms_val.json", bands, size=800)
-    test_data = MultispectralSyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_neo_multispectral_data/transforms_test.json", bands, size=800)
+    train_data = MultispectralRealDataset("/home/amarcos/workspace/TFG/scripts/transforms.json", bands, size=800)
     # test_data = NerfDataset("/DATA/nerf_synthetic/lego/transforms_test.json")
+
 
     k = 1
 
     # train_loader = torch.utils.data.DataLoader(train_data, shuffle=True, batch_size=4096 * k, generator=torch.Generator(device='cuda'),num_workers=4)
     # val_loader = torch.utils.data.DataLoader(val_data, shuffle=True, batch_size=4096 * k, generator=torch.Generator(device='cuda'),num_workers=4)
     train_loader = torch.utils.data.DataLoader(train_data, shuffle=True, batch_size=512 * k, generator=torch.Generator(device='cuda'), num_workers=4)
-    val_loader = torch.utils.data.DataLoader(val_data, shuffle=True, batch_size=512 * k, generator=torch.Generator(device='cuda'), num_workers=4)
 #     test_loader = torch.utils.data.DataLoader(test_data, shuffle=True, batch_size=1024 * 8)
 
-    c = PinholeCamera(800, 800, train_data.focal, train_data.pose, 3, 8)
+    c = PinholeCamera(train_data.width, train_data.height, 939, train_data.pose, 0.1, 10)
     model = Test2().to(device)
     loss = t.nn.MSELoss()
     optim = t.optim.RAdam(params=model.parameters(), lr=0.0005 * k, betas=(0.9, 0.999))
-    r = SimpleRenderer(c, model, 128, n_channels=12)
+    r = SimpleRenderer(c, model, 128, n_channels=8)
 
     # r.render_arbitrary_rays(torch.tensor([[0, 0, 0]], device=device), torch.tensor([[1, 0, 0]], device=device))
 
-    trainer = StaticRenderTrainer(model, optim, loss, train_loader, 'TEST_3', renderer=r)
-    trainer = Validation(trainer, r, val_loader)
+    trainer = StaticRenderTrainer(model, optim, loss, train_loader, 'TEST_REAL', renderer=r)
     # trainer = VisualValidation(trainer, r, val_data)
     # trainer = Validation(trainer, val_loader)
-    trainer = Tensorboard(trainer)
+    loop = TrainLoopWithCheckpoints(trainer, "./checkpoints_multinerf_real/")
 
-    loop = TrainLoopWithCheckpoints(trainer, "./checkpoints_multinerf_neo_cubes/")
-
-    loop.train(0)
+    loop.train(10)
 
     torch.no_grad()
     model.eval()
 
-    _, _, _ = next(iter(val_loader))
 
     c.pose = train_data.pose
     images = []
@@ -215,31 +206,27 @@ if __name__ == '__main__':
 
     total_depth_mse = 0
     total_mse = 0
-    for posei in trange(len(test_data.poses)):
-        c.pose = copy.deepcopy(test_data.poses[posei]).to(device)
+    for posei in trange(len(train_data.poses)):
+        c.pose = copy.deepcopy(train_data.poses[posei]).to(device)
         rgb, weights, depth = r.render()
         # im = (im - im.min()) / (im.max() - im.min())
         im = rgb.detach().cpu().numpy()
         depth = depth.detach().cpu().numpy()
 
-        gt = test_data.images[posei][0]
-        depth_gt = test_data.depths[posei]
+        gt = train_data.images[posei][0]
 
-        for i, band in zip(range(12), BAND_NAMES):
-            cv2.imwrite(f"reconstructed-{band}.png", (im[:, :, i] * 255).astype(np.uint8))
-            cv2.imwrite(f"original-{band}.png", (gt[:, :, i] * 255).astype(np.uint8))
-
-        plt.imshow(depth)
-        plt.imsave(f"reconstructed-DEPTH.png")
-        plt.imshow(depth_gt)
-        plt.imsave(f"original-DEPTH.png")
+        # for i, band in zip(range(8), BAND_NAMES):
+        #     cv2.imwrite(f"reconstructed-{band}.png", (im[:, :, i] * 255).astype(np.uint8))
+        #     cv2.imwrite(f"original-{band}.png", (gt[:, :, i] * 255).astype(np.uint8))
 
         plt.imshow(depth)
         plt.show()
-        plt.imshow(cv2.cvtColor(im[:, :, 1:4], cv2.COLOR_BGR2RGB))
+        plt.imshow(cv2.cvtColor(im[:, :, 0:3], cv2.COLOR_BGR2RGB))
         plt.show()
-        plt.imshow(cv2.cvtColor(gt[:, :, 1:4], cv2.COLOR_BGR2RGB))
+        plt.imshow(cv2.cvtColor(gt[:, :, 0:3], cv2.COLOR_BGR2RGB))
         plt.show()
+
+        exit()
 
         total_mse += np.mean(np.square(im - gt))
         total_depth_mse += np.mean(np.square(depth - depth_gt))
@@ -262,7 +249,7 @@ if __name__ == '__main__':
 
     os.environ['IMAGEIO_FFMPEG_EXE'] = '/usr/bin/ffmpeg'
 
-    writer = imageio.get_writer('TEST_3.mp4', fps=10)
+    writer = imageio.get_writer('TEST_dist_7_shadows_cubes_2.mp4', fps=10)
 
     for im in images:
         writer.append_data(im)

@@ -15,14 +15,17 @@ def get_rays(H, W, K, c2w):
     rays_o = c2w[:3,-1].expand(rays_d.shape)
     return rays_o, rays_d
 
-class PinholeCamera(Camera):
-    def __init__(self, w, h, f, pose, near, far):
+class ComplexPinholeCamera(Camera):
+    def __init__(self, w, h, fx, fy, cx, cy, pose, near, far):
         super().__init__(w, h, pose)
-        self.f = f
+        self.fx = fx
+        self.fy = fy
+        self.cx = cx
+        self.cy = cy
         self.near = near
         self.far = far
 
     def get_rays(self):
-        K = torch.tensor([[self.f, 0, self.w / 2], [0, self.f, self.h / 2], [0, 0, 1], ])
+        K = torch.tensor([[self.fx, 0, self.cx], [0, self.fy, self.cy], [0, 0, 1], ])
         origins, directions = get_rays(self.h, self.w, K, self.pose)
         return origins.to(device), directions.to(device)
