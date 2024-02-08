@@ -22,7 +22,7 @@ from src.training.decorators.Checkpoint import Checkpoint
 from src.training.decorators.Tensorboard import Tensorboard
 from src.training.decorators.Validation import Validation
 from src.training.decorators.VisualValidation import VisualValidation
-from src.volume_render.cameras.PinholeCamera import PinholeCamera
+from src.volume_render.cameras.ComplexPinholeCamera import ComplexPinholeCamera
 from src.volume_render.SimpleRenderer import SimpleRenderer
 
 
@@ -147,7 +147,8 @@ if __name__ == '__main__':
     ]
 
     # data = SyntheticEODataset("/home/amarcos/workspace/TFG/scripts/generated_eo_test_data/")
-    train_data = MultispectralRealDataset("/home/amarcos/workspace/TFG/scripts/transforms.json", bands, size=800)
+    train_data = MultispectralRealDataset("/home/arnau-marcos-almansa/workspace/TFG/scripts/transforms.json", bands, size=800)
+    test_data = MultispectralRealDataset("/home/arnau-marcos-almansa/workspace/TFG/scripts/transforms_test.json",  bands, size=800)
     # test_data = NerfDataset("/DATA/nerf_synthetic/lego/transforms_test.json")
 
 
@@ -158,7 +159,7 @@ if __name__ == '__main__':
     train_loader = torch.utils.data.DataLoader(train_data, shuffle=True, batch_size=512 * k, generator=torch.Generator(device='cuda'), num_workers=4)
 #     test_loader = torch.utils.data.DataLoader(test_data, shuffle=True, batch_size=1024 * 8)
 
-    c = PinholeCamera(train_data.width, train_data.height, 939, train_data.pose, 0.1, 10)
+    c = train_data.get_camera(train_data.pose, 0.1, 10)
     model = Test2().to(device)
     loss = t.nn.MSELoss()
     optim = t.optim.RAdam(params=model.parameters(), lr=0.0005 * k, betas=(0.9, 0.999))
@@ -171,7 +172,7 @@ if __name__ == '__main__':
     # trainer = Validation(trainer, val_loader)
     loop = TrainLoopWithCheckpoints(trainer, "./checkpoints_multinerf_real/")
 
-    loop.train(10)
+    loop.train(20)
 
     torch.no_grad()
     model.eval()
@@ -226,14 +227,11 @@ if __name__ == '__main__':
         plt.imshow(cv2.cvtColor(gt[:, :, 0:3], cv2.COLOR_BGR2RGB))
         plt.show()
 
-        exit()
-
         total_mse += np.mean(np.square(im - gt))
-        total_depth_mse += np.mean(np.square(depth - depth_gt))
 
 
-    print(f"val MSE = {total_mse / len(val_data.poses)}")
-    print(f"val DEPTH MSE = {total_depth_mse / len(val_data.poses)}")
+    print(f"val MSE = {total_mse / len(test_data.poses)}")
+    print(f"val DEPTH MSE = {total_depth_mse / len(test_data.poses)}")
 
 
     # for o in np.arange(0, 1, 1):

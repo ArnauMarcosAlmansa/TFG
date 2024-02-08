@@ -28,7 +28,10 @@ class MultispectralRealDataset:
         self.height = 0
         self.transform = transform
 
-        self.focal = 0
+        self.fx = 0
+        self.fy = 0
+        self.cx = 0
+        self.cy = 0
         self.pose = None
 
         self.early = True
@@ -66,6 +69,12 @@ class MultispectralRealDataset:
                 self.width = im.shape[1]
                 self.width = im.shape[1]
                 self.height = im.shape[0]
+                self.fx = fx
+                self.fy = fy
+                self.cx = cx
+                self.cy = cy
+
+                print(f"fx = {fx:.2f}, fy = {fy:.2f}")
 
                 pose = np.zeros((4, 4,), dtype=np.float32)
                 for i in range(4):
@@ -94,3 +103,6 @@ class MultispectralRealDataset:
         image_index, x, y = self.compute_idex(item)
 
         return self.images[image_index][0][x, y], self.images[image_index][1][x, y], self.images[image_index][2][x, y]
+
+    def get_camera(self, pose, near, far):
+        return ComplexPinholeCamera(self.width, self.height, self.fx, self.fy, self.cx, self.cy, pose.to(device), near, far)
